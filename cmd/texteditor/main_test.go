@@ -8,12 +8,10 @@ import (
 
 // TestDrawUI checks that drawUI does not panic and sets expected content.
 func TestDrawUI(t *testing.T) {
-	s, err := tcell.NewScreen()
-	if err != nil {
-		t.Fatalf("creating screen failed: %v", err)
-	}
-	if err = s.Init(); err != nil {
-		t.Fatalf("initializing screen failed: %v", err)
+	// Use simulation screen for tests
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("initializing simulation screen failed: %v", err)
 	}
 	defer s.Fini()
 
@@ -38,12 +36,9 @@ func TestDrawUI(t *testing.T) {
 
 // TestDrawHelp checks that drawHelp does not panic.
 func TestDrawHelp(t *testing.T) {
-	s, err := tcell.NewScreen()
-	if err != nil {
-		t.Fatalf("creating screen failed: %v", err)
-	}
-	if err = s.Init(); err != nil {
-		t.Fatalf("initializing screen failed: %v", err)
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("initializing simulation screen failed: %v", err)
 	}
 	defer s.Fini()
 
