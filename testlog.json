@@ -1,0 +1,8 @@
+{"Time":"2025-08-09T07:56:53.493222+09:00","Action":"start","Package":"example.com/texteditor/internal/app"}
+{"Time":"2025-08-09T07:56:53.74038+09:00","Action":"run","Package":"example.com/texteditor/internal/app","Test":"TestRun_TypingSaveQuit_Simulation"}
+{"Time":"2025-08-09T07:56:53.740532+09:00","Action":"output","Package":"example.com/texteditor/internal/app","Test":"TestRun_TypingSaveQuit_Simulation","Output":"=== RUN   TestRun_TypingSaveQuit_Simulation\n"}
+{"Time":"2025-08-09T07:56:53.752635+09:00","Action":"output","Package":"example.com/texteditor/internal/app","Test":"TestRun_TypingSaveQuit_Simulation","Output":"--- PASS: TestRun_TypingSaveQuit_Simulation (0.01s)\n"}
+{"Time":"2025-08-09T07:56:53.752673+09:00","Action":"pass","Package":"example.com/texteditor/internal/app","Test":"TestRun_TypingSaveQuit_Simulation","Elapsed":0.01}
+{"Time":"2025-08-09T07:56:53.752733+09:00","Action":"output","Package":"example.com/texteditor/internal/app","Output":"PASS\n"}
+{"Time":"2025-08-09T07:56:53.753415+09:00","Action":"output","Package":"example.com/texteditor/internal/app","Output":"ok  \texample.com/texteditor/internal/app\t0.260s\n"}
+{"Time":"2025-08-09T07:56:53.756218+09:00","Action":"pass","Package":"example.com/texteditor/internal/app","Elapsed":0.263}

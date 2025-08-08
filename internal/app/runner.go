@@ -1,26 +1,31 @@
 package app
 
 import (
-	"os"
-	"strings"
+    "os"
+    "strings"
 
-	"example.com/texteditor/pkg/buffer"
-	"example.com/texteditor/pkg/search"
-	"github.com/gdamore/tcell/v2"
+    "example.com/texteditor/pkg/buffer"
+    "example.com/texteditor/pkg/history"
+    "example.com/texteditor/pkg/search"
+    "example.com/texteditor/pkg/logs"
+    "github.com/gdamore/tcell/v2"
 )
 
 // Runner owns the terminal lifecycle and a minimal event loop.
 type Runner struct {
-	Screen   tcell.Screen
-	FilePath string
-	Buf      *buffer.GapBuffer
-	Cursor   int // cursor position in runes
-	Dirty    bool
-	ShowHelp bool
+    Screen   tcell.Screen
+    FilePath string
+    Buf      *buffer.GapBuffer
+    Cursor   int // cursor position in runes
+    Dirty    bool
+    ShowHelp bool
+    History  *history.History
+    KillRing history.KillRing
+    Logger   *logs.Logger
 }
 
 // New creates an empty Runner.
-func New() *Runner { return &Runner{Buf: buffer.NewGapBuffer(0)} }
+func New() *Runner { return &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()} }
 
 // LoadFile loads a file into the runner's buffer.
 func (r *Runner) LoadFile(path string) error {
@@ -71,21 +76,33 @@ func (r *Runner) InitScreen() error {
 
 // Fini finalizes the screen if initialized.
 func (r *Runner) Fini() {
-	if r.Screen != nil {
-		r.Screen.Fini()
-		r.Screen = nil
-	}
+    if r.Screen != nil {
+        r.Screen.Fini()
+        r.Screen = nil
+    }
+    if r.Logger != nil {
+        r.Logger.Close()
+    }
 }
 
 // Run starts the event loop. It will initialize the screen if needed and
 // return when the user requests quit (Ctrl+Q).
 func (r *Runner) Run() error {
-	if r.Screen == nil {
-		if err := r.InitScreen(); err != nil {
-			return err
-		}
-		defer r.Fini()
-	}
+    if r.Screen == nil {
+        if err := r.InitScreen(); err != nil {
+            return err
+        }
+        defer r.Fini()
+    }
+
+    // Initialize logger from env (no-op if disabled)
+    if r.Logger == nil {
+        r.Logger = logs.NewFromEnv()
+    }
+    if r.Logger != nil {
+        r.Logger.Event("run.start", map[string]any{"file": r.FilePath})
+        defer r.Logger.Event("run.end", map[string]any{"file": r.FilePath})
+    }
 
 	// initial draw
 	if r.Buf != nil && r.Buf.Len() > 0 {
@@ -97,11 +114,22 @@ func (r *Runner) Run() error {
 	for {
 		ev := r.Screen.PollEvent()
 		switch ev := ev.(type) {
-		case *tcell.EventKey:
-			// If handleKeyEvent returns true, we should quit
-			if r.handleKeyEvent(ev) {
-				return nil
-			}
+        case *tcell.EventKey:
+            if r.Logger != nil {
+                r.Logger.Event("key", map[string]any{
+                    "type":      "EventKey",
+                    "key":       int(ev.Key()),
+                    "rune":      string(ev.Rune()),
+                    "modifiers": int(ev.Modifiers()),
+                })
+            }
+            // If handleKeyEvent returns true, we should quit
+            if r.handleKeyEvent(ev) {
+                if r.Logger != nil {
+                    r.Logger.Event("action", map[string]any{"name": "quit"})
+                }
+                return nil
+            }
 			// If we were showing help, any key dismisses it and we redraw
 			if r.ShowHelp {
 				r.ShowHelp = false
@@ -138,85 +166,165 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	if ev.Key() == tcell.KeyCtrlQ {
 		return true
 	}
-	// Ctrl+S -> save
-	if ev.Key() == tcell.KeyRune && ev.Rune() == 's' && ev.Modifiers() == tcell.ModCtrl {
-		_ = r.Save()
-		if r.Screen != nil {
-			if r.Buf != nil && r.Buf.Len() > 0 {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
-			} else {
-				drawUI(r.Screen)
-			}
-		}
-		return false
-	}
+    // Ctrl+S -> save
+    if ev.Key() == tcell.KeyRune && ev.Rune() == 's' && ev.Modifiers() == tcell.ModCtrl {
+        _ = r.Save()
+        if r.Logger != nil {
+            r.Logger.Event("action", map[string]any{"name": "save", "file": r.FilePath})
+        }
+        if r.Screen != nil {
+            if r.Buf != nil && r.Buf.Len() > 0 {
+                drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+            } else {
+                drawUI(r.Screen)
+            }
+        }
+        return false
+    }
+    // Ctrl+Z -> undo
+    if ev.Key() == tcell.KeyRune && ev.Rune() == 'z' && ev.Modifiers() == tcell.ModCtrl {
+        if r.History != nil {
+            _ = r.History.Undo(r.Buf, &r.Cursor)
+            r.Dirty = true
+            if r.Logger != nil {
+                r.Logger.Event("action", map[string]any{"name": "undo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+            }
+            if r.Screen != nil {
+                drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+            }
+        }
+        return false
+    }
+    // Ctrl+Y -> redo
+    if ev.Key() == tcell.KeyRune && ev.Rune() == 'y' && ev.Modifiers() == tcell.ModCtrl {
+        if r.History != nil {
+            _ = r.History.Redo(r.Buf, &r.Cursor)
+            r.Dirty = true
+            if r.Logger != nil {
+                r.Logger.Event("action", map[string]any{"name": "redo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+            }
+            if r.Screen != nil {
+                drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+            }
+        }
+        return false
+    }
 	// Ctrl+W -> incremental search prompt
-	if ev.Key() == tcell.KeyRune && ev.Rune() == 'w' && ev.Modifiers() == tcell.ModCtrl {
-		r.runSearchPrompt()
-		return false
-	}
+    if ev.Key() == tcell.KeyRune && ev.Rune() == 'w' && ev.Modifiers() == tcell.ModCtrl {
+        r.runSearchPrompt()
+        if r.Logger != nil {
+            r.Logger.Event("action", map[string]any{"name": "search.prompt"})
+        }
+        return false
+    }
 	// Alt+G -> go-to line (Alt modifier)
-	if ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == tcell.ModAlt {
-		r.runGoToPrompt()
-		return false
-	}
-	// Show help on 'h'
-	if ev.Key() == tcell.KeyRune && ev.Rune() == 'h' {
-		r.ShowHelp = true
-		if r.Screen != nil {
-			drawHelp(r.Screen)
-		}
-		return false
-	}
+    if ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == tcell.ModAlt {
+        r.runGoToPrompt()
+        if r.Logger != nil {
+            r.Logger.Event("action", map[string]any{"name": "goto.prompt"})
+        }
+        return false
+    }
+    // Show help on 'h'
+    if ev.Key() == tcell.KeyRune && ev.Rune() == 'h' {
+        r.ShowHelp = true
+        if r.Logger != nil {
+            r.Logger.Event("action", map[string]any{"name": "help.show"})
+        }
+        if r.Screen != nil {
+            drawHelp(r.Screen)
+        }
+        return false
+    }
 
-	// Insert typed rune (simple handling: any rune with no Ctrl/Alt)
-	if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
-		r.Buf.Insert(r.Cursor, []rune{ev.Rune()})
-		r.Cursor++
-		r.Dirty = true
-		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
-		}
-		return false
-	}
+    // Insert typed rune (simple handling: any rune with no Ctrl/Alt)
+    if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
+        text := string(ev.Rune())
+        r.insertText(text)
+        if r.Logger != nil {
+            r.Logger.Event("action", map[string]any{"name": "insert", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+        }
+        if r.Screen != nil {
+            drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+        }
+        return false
+    }
 
 	// Backspace
-	if ev.Key() == tcell.KeyBackspace || ev.Key() == tcell.KeyBackspace2 {
-		if r.Cursor > 0 {
-			r.Buf.Delete(r.Cursor-1, r.Cursor)
-			if r.Cursor > 0 {
-				r.Cursor--
-			}
-			r.Dirty = true
-			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
-			}
-		}
-		return false
-	}
+    if ev.Key() == tcell.KeyBackspace || ev.Key() == tcell.KeyBackspace2 {
+        if r.Cursor > 0 {
+            // capture deleted rune
+            del := string(r.Buf.Slice(r.Cursor-1, r.Cursor))
+            _ = r.deleteRange(r.Cursor-1, r.Cursor, del)
+            if r.Logger != nil {
+                r.Logger.Event("action", map[string]any{"name": "backspace", "deleted": del, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+            }
+            if r.Screen != nil {
+                drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+            }
+        }
+        return false
+    }
 
 	// Delete (forward)
-	if ev.Key() == tcell.KeyDelete {
-		if r.Cursor < r.Buf.Len() {
-			r.Buf.Delete(r.Cursor, r.Cursor+1)
-			r.Dirty = true
-			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
-			}
-		}
-		return false
-	}
+    if ev.Key() == tcell.KeyDelete {
+        if r.Cursor < r.Buf.Len() {
+            del := string(r.Buf.Slice(r.Cursor, r.Cursor+1))
+            _ = r.deleteRange(r.Cursor, r.Cursor+1, del)
+            if r.Logger != nil {
+                r.Logger.Event("action", map[string]any{"name": "delete", "deleted": del, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+            }
+            if r.Screen != nil {
+                drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+            }
+        }
+        return false
+    }
 
 	// Enter -> newline
-	if ev.Key() == tcell.KeyEnter {
-		r.Buf.Insert(r.Cursor, []rune{'\n'})
-		r.Cursor++
-		r.Dirty = true
-		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
-		}
-		return false
-	}
+    if ev.Key() == tcell.KeyEnter {
+        r.insertText("\n")
+        if r.Logger != nil {
+            r.Logger.Event("action", map[string]any{"name": "newline", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+        }
+        if r.Screen != nil {
+            drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+        }
+        return false
+    }
+
+    // Ctrl+K -> kill (cut) current line to kill ring
+    if ev.Key() == tcell.KeyRune && ev.Rune() == 'k' && ev.Modifiers() == tcell.ModCtrl {
+        start, end := r.currentLineBounds()
+        if end > start {
+            text := string(r.Buf.Slice(start, end))
+            _ = r.deleteRange(start, end, text)
+            r.KillRing.Set(text)
+            if r.Logger != nil {
+                r.Logger.Event("action", map[string]any{"name": "kill.line", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+            }
+            // Move cursor to start (now at next line)
+            r.Cursor = start
+            if r.Screen != nil {
+                drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+            }
+        }
+        return false
+    }
+    // Ctrl+U -> yank (paste) from kill ring
+    if ev.Key() == tcell.KeyRune && ev.Rune() == 'u' && ev.Modifiers() == tcell.ModCtrl {
+        if r.KillRing.HasData() {
+            text := r.KillRing.Get()
+            r.insertText(text)
+            if r.Logger != nil {
+                r.Logger.Event("action", map[string]any{"name": "yank", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+            }
+            if r.Screen != nil {
+                drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+            }
+        }
+        return false
+    }
 
 	return false
 }
@@ -266,6 +374,58 @@ func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights 
 	content := buf.String()
 	lines := strings.Split(content, "\n")
 	drawFile(s, fname, lines, highlights)
+}
+
+// insertText inserts text at the current cursor, records history, and updates state.
+func (r *Runner) insertText(text string) {
+    if text == "" {
+        return
+    }
+    _ = r.Buf.Insert(r.Cursor, []rune(text))
+    if r.History != nil {
+        r.History.RecordInsert(r.Cursor, text)
+    }
+    r.Cursor += len([]rune(text))
+    r.Dirty = true
+}
+
+// deleteRange deletes [start,end) with provided text for history and updates cursor.
+func (r *Runner) deleteRange(start, end int, text string) error {
+    if start < 0 {
+        start = 0
+    }
+    if end > r.Buf.Len() {
+        end = r.Buf.Len()
+    }
+    if start >= end {
+        return nil
+    }
+    if err := r.Buf.Delete(start, end); err != nil {
+        return err
+    }
+    if r.History != nil {
+        r.History.RecordDelete(start, text)
+    }
+    // adjust cursor
+    if r.Cursor > end {
+        r.Cursor -= (end - start)
+    } else if r.Cursor > start {
+        r.Cursor = start
+    }
+    r.Dirty = true
+    return nil
+}
+
+// currentLineBounds returns the rune start and end indices for the current cursor's line.
+func (r *Runner) currentLineBounds() (start, end int) {
+    // compute line index by counting newlines up to cursor
+    line := 0
+    for i := 0; i < r.Cursor && i < r.Buf.Len(); i++ {
+        if string(r.Buf.Slice(i, i+1)) == "\n" {
+            line++
+        }
+    }
+    return r.Buf.LineAt(line)
 }
 
 func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range) {

@@ -455,4 +455,51 @@ If you want, I can now open separate branches and start M3 work tomorrow, or wri
 
 ``` 
 
+⸻
+
+Next Milestone — Open/Save UX (M2.5)
+
+Purpose
+- Add in-editor file open and save-as flows, basic status messaging, and a clearer status bar so users can open existing files and write new ones without restarting the app.
+
+Scope
+- Ctrl+O Open Prompt: status-line modal to type a path; Enter loads file, Esc cancels.
+- Save vs Save As: Ctrl+S saves to current path; Ctrl+Shift+S (or Ctrl+S when no path) prompts for a filename and writes there.
+- Status bar: show filename or [No File], dirty indicator [+], and line:col.
+- Transient status messages: show success/errors on the bottom line.
+
+Tasks
+- UI prompts (internal/app):
+  - open_ui.go: runOpenPrompt() using tcell, mirroring search/go-to prompt patterns.
+  - save_ui.go: runSaveAsPrompt() with overwrite handling; Esc cancel.
+- Runner methods:
+  - SaveAs(path string) error: set FilePath and call Save(); return errors to callers.
+  - flashStatus(msg string): draw a one-line message on the status bar (non-blocking, cleared on next redraw).
+- Keybindings (wire in handleKeyEvent):
+  - Ctrl+O → runOpenPrompt().
+  - Ctrl+S → Save() if FilePath set else runSaveAsPrompt().
+  - Ctrl+Shift+S → runSaveAsPrompt().
+- Rendering:
+  - drawBuffer(): include filename, [+] when Dirty, and current line:col in the status bar.
+
+Files To Add/Modify
+- internal/app/open_ui.go, internal/app/save_ui.go
+- internal/app/runner.go (keybindings + SaveAs + flashStatus)
+- internal/app/runner_test.go (integration tests using tcell simulation)
+- readme.md (this section)
+
+Acceptance Criteria
+- From a fresh session with no args: type, Save As to a new file, reopen to confirm contents.
+- Ctrl+O opens an existing path and renders its contents without restarting.
+- Dirty flag updates on edits; saving clears it; status bar shows filename and [+] appropriately, plus line:col.
+- Error conditions (e.g., missing path, permission denied) show a transient message instead of crashing.
+
+Tests
+- Unit: Runner.LoadFile normalizes CRLF; Save/SaveAs success and error paths.
+- Integration: simulation screen posts key events to exercise Ctrl+O and Save-As flows end-to-end.
+
+Notes
+- Navigation/scrolling can follow; not required for this milestone.
+- Overwrite handling: prompt or allow overwrite with a status message; choose simplest acceptable path first, then refine.
+
 End of README.
