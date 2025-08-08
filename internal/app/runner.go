@@ -168,9 +168,29 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	}
     // Ctrl+S -> save
     if ev.Key() == tcell.KeyRune && ev.Rune() == 's' && ev.Modifiers() == tcell.ModCtrl {
-        _ = r.Save()
+        if r.FilePath == "" {
+            // No file path set; prompt for Save As
+            r.runSaveAsPrompt()
+        } else {
+            _ = r.Save()
+        }
         if r.Logger != nil {
             r.Logger.Event("action", map[string]any{"name": "save", "file": r.FilePath})
+        }
+        if r.Screen != nil {
+            if r.Buf != nil && r.Buf.Len() > 0 {
+                drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+            } else {
+                drawUI(r.Screen)
+            }
+        }
+        return false
+    }
+    // Ctrl+O -> open file prompt
+    if ev.Key() == tcell.KeyRune && ev.Rune() == 'o' && ev.Modifiers() == tcell.ModCtrl {
+        r.runOpenPrompt()
+        if r.Logger != nil {
+            r.Logger.Event("action", map[string]any{"name": "open.prompt"})
         }
         if r.Screen != nil {
             if r.Buf != nil && r.Buf.Len() > 0 {

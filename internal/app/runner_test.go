@@ -232,3 +232,42 @@ func TestRun_TypingSaveQuit_Simulation(t *testing.T) {
         t.Fatalf("expected Dirty=false after save")
     }
 }
+
+func TestRunner_LoadFile_NormalizesCRLF(t *testing.T) {
+    f, err := os.CreateTemp("", "texteditor_crlf_*")
+    if err != nil { t.Fatalf("create temp: %v", err) }
+    path := f.Name()
+    _, _ = f.WriteString("a\r\nb\r\n")
+    _ = f.Close()
+    defer os.Remove(path)
+
+    r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
+    if err := r.LoadFile(path); err != nil {
+        t.Fatalf("LoadFile: %v", err)
+    }
+    if got := r.Buf.String(); got != "a\nb\n" {
+        t.Fatalf("expected normalized newlines, got %q", got)
+    }
+}
+
+func TestRunner_SaveAs_WritesAndClearsDirty(t *testing.T) {
+    f, err := os.CreateTemp("", "texteditor_saveas_*")
+    if err != nil { t.Fatalf("create temp: %v", err) }
+    path := f.Name()
+    _ = f.Close()
+    defer os.Remove(path)
+
+    r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
+    // type 'a','b'
+    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
+    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
+    if !r.Dirty { t.Fatalf("expected Dirty after typing") }
+    if err := r.SaveAs(path); err != nil {
+        t.Fatalf("SaveAs: %v", err)
+    }
+    data, err := os.ReadFile(path)
+    if err != nil { t.Fatalf("read saved: %v", err) }
+    if string(data) != "ab" { t.Fatalf("expected 'ab', got %q", string(data)) }
+    if r.Dirty { t.Fatalf("expected Dirty=false after save") }
+    if r.FilePath != path { t.Fatalf("expected FilePath %q, got %q", path, r.FilePath) }
+}
