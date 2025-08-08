@@ -365,4 +365,67 @@ How an Agent Should Start
 
 ⸻
 
+Next Todos (short-term: M3–M5)
+
+The following is a concrete, actionable plan for the next milestones (M3–M5). Each item includes sub-tasks, files to modify/create, acceptance criteria, tests to add, and a rough estimate.
+
+```
+- [ ] M3: Incremental Search & Go-to (est. 3–5 dev hours)
+  - Tasks:
+    - Implement pkg/search with a simple incremental search API (SearchNext, SearchAll, HighlightRanges).
+    - Add a Search UI in internal/app: Ctrl+W opens a small prompt at the status line, types filter, highlights matches, Enter jumps to current match, Esc cancels.
+    - Implement go-to line (Ctrl+_ or Alt+G) with a modal prompt and cursor jump.
+  - Files:
+    - pkg/search/search.go, pkg/search/search_test.go
+    - internal/app/search_ui.go (prompt integration)
+    - internal/app/runner.go (wire keybindings to UI)
+  - Acceptance criteria:
+    - Incremental search highlights matches as you type and can jump to a result.
+    - Go-to line moves the cursor to specified line.
+    - Unit tests for search logic and integration tests for prompt -> jump flow.
+
+- [ ] M4: Kill/Yank (clipboard-like) & Undo/Redo v1 (est. 4–8 dev hours)
+  - Tasks:
+    - Implement a simple kill-ring structure (one slot v1) in pkg/history or pkg/clipboard.
+    - Add undo/redo stack in pkg/history with basic command records for Insert/Delete operations.
+    - Bindings: Ctrl+K cuts the current line (store in kill-ring and delete), Ctrl+U pastes the kill ring at cursor, Ctrl+Z/Ctrl+Y undo/redo.
+    - Tests for history correctness and kill/paste round-trips.
+  - Files:
+    - pkg/history/history.go, pkg/history/history_test.go
+    - pkg/clipboard/killring.go (or under pkg/history)
+    - internal/app/runner.go (key handling to call history/clipboard funcs)
+  - Acceptance criteria:
+    - Basic kill and yank work for single-line operations.
+    - Undo reverts the last edit; redo reapplies it. Tests cover sequence of ops.
+
+- [ ] M5: Config Loader & Keymap Remapping (est. 3–6 dev hours)
+  - Tasks:
+    - Implement pkg/config to load YAML (viper or yaml.v3) and validate config.
+    - Implement a simple keymap resolver in pkg/input that maps string key descriptors ("Ctrl+S", "F2") to command IDs.
+    - Wire config load at startup (internal/app.New or main) and allow overriding default keymap.
+    - Add a small integration test that writes a temp config that remaps Ctrl+S to a noop and verifies save key no longer triggers write.
+  - Files:
+    - pkg/config/config.go, pkg/config/config_test.go
+    - pkg/input/keymap.go, pkg/input/keymap_test.go
+    - internal/app/runner.go (read config on Init and consult keymap)
+  - Acceptance criteria:
+    - Config is loadable and valid; keymap changes affect command bindings in runtime.
+    - Tests validate keymap resolution logic.
+```
+
+Notes & priorities
+- Prioritize M3 first since search helps users navigate content and pairs well with the existing buffer rendering.
+- M4 depends on reliable edit/undo semantics — keep operations small and well-tested.
+- M5 can be done in parallel or after M3/M4; it primarily affects key resolution and UX.
+
+Suggested workflow for each item
+- Create a small branch per milestone (e.g., feature/m3-search).
+- Write unit tests first (pkg/search, pkg/history, pkg/config) then implement minimal passing code.
+- Add integration tests for internal/app where practical (use tcell event simulation where possible or test UI helpers in isolation).
+- Keep PRs small (< 300 LOC) and focused on the milestone.
+
+If you want, I can now open separate branches and start M3 work tomorrow, or write the first issue/PR description for M3.
+
+``` 
+
 End of README.
