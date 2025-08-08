@@ -2,9 +2,11 @@ package app
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"example.com/texteditor/pkg/buffer"
+	"example.com/texteditor/pkg/search"
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -80,5 +82,46 @@ func TestRunner_BackspaceAndDelete(t *testing.T) {
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyDelete, 0, 0))
 	if r.Buf.String() != "b" {
 		t.Fatalf("expected 'b' after delete, got %q", r.Buf.String())
+	}
+}
+
+func TestDrawFile_Highlights(t *testing.T) {
+	// Use simulation screen
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("initializing simulation screen failed: %v", err)
+	}
+	defer s.Fini()
+
+	text := "hello world\nhello"
+	lines := strings.Split(text, "\n")
+	// compute highlights for "hello"
+	ranges := search.SearchAll(text, "hello")
+
+	// draw with highlights
+	drawFile(s, "f.txt", lines, ranges)
+
+	// check first line "hello" at (0,0..4) is highlighted
+	for x := 0; x < 5; x++ {
+		cr, _, style, _ := s.GetContent(x, 0)
+		if cr != rune("hello"[x]) {
+			t.Fatalf("expected rune %q at (%d,0) got %q", rune("hello"[x]), x, cr)
+		}
+		expStyle := tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorYellow)
+		if style != expStyle {
+			t.Fatalf("expected highlighted style at (%d,0) got %v", x, style)
+		}
+	}
+
+	// check second line "hello" at (0,1..4)
+	for x := 0; x < 5; x++ {
+		cr, _, style, _ := s.GetContent(x, 1)
+		if cr != rune("hello"[x]) {
+			t.Fatalf("expected rune %q at (%d,1) got %q", rune("hello"[x]), x, cr)
+		}
+		expStyle := tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorYellow)
+		if style != expStyle {
+			t.Fatalf("expected highlighted style at (%d,1) got %v", x, style)
+		}
 	}
 }

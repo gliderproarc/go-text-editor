@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"example.com/texteditor/pkg/buffer"
+	"example.com/texteditor/pkg/search"
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -88,7 +89,7 @@ func (r *Runner) Run() error {
 
 	// initial draw
 	if r.Buf != nil && r.Buf.Len() > 0 {
-		drawBuffer(r.Screen, r.Buf, r.FilePath)
+		drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
 	} else {
 		drawUI(r.Screen)
 	}
@@ -105,7 +106,7 @@ func (r *Runner) Run() error {
 			if r.ShowHelp {
 				r.ShowHelp = false
 				if r.Buf != nil && r.Buf.Len() > 0 {
-					drawBuffer(r.Screen, r.Buf, r.FilePath)
+					drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
 				} else {
 					drawUI(r.Screen)
 				}
@@ -117,7 +118,7 @@ func (r *Runner) Run() error {
 				drawHelp(r.Screen)
 			} else {
 				if r.Buf != nil && r.Buf.Len() > 0 {
-					drawBuffer(r.Screen, r.Buf, r.FilePath)
+					drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
 				} else {
 					drawUI(r.Screen)
 				}
@@ -142,11 +143,21 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		_ = r.Save()
 		if r.Screen != nil {
 			if r.Buf != nil && r.Buf.Len() > 0 {
-				drawBuffer(r.Screen, r.Buf, r.FilePath)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
 			} else {
 				drawUI(r.Screen)
 			}
 		}
+		return false
+	}
+	// Ctrl+W -> incremental search prompt
+	if ev.Key() == tcell.KeyRune && ev.Rune() == 'w' && ev.Modifiers() == tcell.ModCtrl {
+		r.runSearchPrompt()
+		return false
+	}
+	// Alt+G -> go-to line (Alt modifier)
+	if ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == tcell.ModAlt {
+		r.runGoToPrompt()
 		return false
 	}
 	// Show help on 'h'
@@ -164,7 +175,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		r.Cursor++
 		r.Dirty = true
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath)
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
 		}
 		return false
 	}
@@ -178,7 +189,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			}
 			r.Dirty = true
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
 			}
 		}
 		return false
@@ -190,7 +201,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Buf.Delete(r.Cursor, r.Cursor+1)
 			r.Dirty = true
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
 			}
 		}
 		return false
@@ -202,7 +213,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		r.Cursor++
 		r.Dirty = true
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath)
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
 		}
 		return false
 	}
@@ -247,29 +258,74 @@ func drawHelp(s tcell.Screen) {
 	s.Show()
 }
 
-func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string) {
+func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range) {
 	if buf == nil {
-		drawFile(s, fname, []string{})
+		drawFile(s, fname, []string{}, highlights)
 		return
 	}
 	content := buf.String()
 	lines := strings.Split(content, "\n")
-	drawFile(s, fname, lines)
+	drawFile(s, fname, lines, highlights)
 }
 
-func drawFile(s tcell.Screen, fname string, lines []string) {
+func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range) {
 	width, height := s.Size()
 	s.Clear()
 	maxLines := height - 1
 	if maxLines < 0 {
 		maxLines = 0
 	}
+	lineStart := 0 // byte offset of start of current line
 	for i := 0; i < maxLines && i < len(lines); i++ {
 		line := lines[i]
 		runes := []rune(line)
-		for j := 0; j < width && j < len(runes); j++ {
-			s.SetContent(j, i, runes[j], nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
+		// compute highlights for this line as rune index intervals
+		hl := make([]bool, len(runes))
+		if len(highlights) > 0 {
+			lineBytesLen := len(line)
+			lineStartByte := lineStart
+			lineEndByte := lineStartByte + lineBytesLen
+			for _, h := range highlights {
+				if h.Start < lineEndByte && h.End > lineStartByte {
+					overlapStart := h.Start
+					if overlapStart < lineStartByte {
+						overlapStart = lineStartByte
+					}
+					overlapEnd := h.End
+					if overlapEnd > lineEndByte {
+						overlapEnd = lineEndByte
+					}
+					// convert byte offsets relative to line to rune indices
+					startRune := 0
+					endRune := 0
+					if overlapStart-lineStartByte > 0 {
+						startRune = len([]rune(line[:overlapStart-lineStartByte]))
+					}
+					if overlapEnd-lineStartByte > 0 {
+						endRune = len([]rune(line[:overlapEnd-lineStartByte]))
+					}
+					if startRune < 0 {
+						startRune = 0
+					}
+					if endRune > len(runes) {
+						endRune = len(runes)
+					}
+					for ri := startRune; ri < endRune && ri < len(hl); ri++ {
+						hl[ri] = true
+					}
+				}
+			}
 		}
+		for j := 0; j < width && j < len(runes); j++ {
+			ch := runes[j]
+			if j < len(hl) && hl[j] {
+				s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorYellow))
+			} else {
+				s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
+			}
+		}
+		// advance lineStart by bytes in line + 1 for the newline
+		lineStart += len([]byte(line)) + 1
 	}
 	status := fname + " — Press Ctrl+Q to exit"
 	if len(status) > width {

@@ -27,6 +27,33 @@ go test ./...
 
 ⸻
 
+Example: Build & basic usage
+
+Build the editor binary from the repository root:
+
+    go build ./cmd/texteditor
+
+This produces a binary named `texteditor` in the working directory. Run it with an optional file path:
+
+    ./texteditor [path/to/file]
+
+Interactive example (typical session):
+
+- Open a file:
+
+    ./texteditor README.md
+
+- Move the cursor with the arrow keys, PageUp/PageDown, Home/End.
+- Search (incremental): press Ctrl+W, type a query — matches are highlighted in the viewport as you type; press Enter to jump to the current match, Esc to cancel.
+- Go to line: press Alt+G, enter a 1-based line number, press Enter to jump.
+- Save changes: press Ctrl+S.
+- Quit: press Ctrl+Q (the editor will prompt if the buffer is dirty in future milestones).
+
+Notes:
+- Search highlights and go-to behavior are implemented in M3. Highlight styles use a high-contrast background for visibility; theming and color configuration come later (M5).
+
+⸻
+
 1) Project Phases & Milestones
 
 We’ll ship in small, testable increments. Each milestone has acceptance criteria.
