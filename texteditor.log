@@ -1,0 +1,44 @@
+{"event":"run.start","file":"","time":"2025-08-10T08:07:32.016082+09:00"}
+{"event":"key","key":15,"modifiers":2,"rune":"\u000f","time":"2025-08-10T08:07:34.053662+09:00","type":"EventKey"}
+{"event":"key","key":15,"modifiers":2,"rune":"\u000f","time":"2025-08-10T08:07:36.409951+09:00","type":"EventKey"}
+{"event":"key","key":256,"modifiers":0,"rune":"a","time":"2025-08-10T08:07:38.014872+09:00","type":"EventKey"}
+{"buffer_len":1,"cursor":1,"event":"action","name":"insert","text":"a","time":"2025-08-10T08:07:38.014986+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":"s","time":"2025-08-10T08:07:38.474605+09:00","type":"EventKey"}
+{"buffer_len":2,"cursor":2,"event":"action","name":"insert","text":"s","time":"2025-08-10T08:07:38.474724+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":"a","time":"2025-08-10T08:07:38.629117+09:00","type":"EventKey"}
+{"buffer_len":3,"cursor":3,"event":"action","name":"insert","text":"a","time":"2025-08-10T08:07:38.62925+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":"s","time":"2025-08-10T08:07:38.820083+09:00","type":"EventKey"}
+{"buffer_len":4,"cursor":4,"event":"action","name":"insert","text":"s","time":"2025-08-10T08:07:38.820151+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":" ","time":"2025-08-10T08:07:40.007849+09:00","type":"EventKey"}
+{"buffer_len":5,"cursor":5,"event":"action","name":"insert","text":" ","time":"2025-08-10T08:07:40.007957+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":"b","time":"2025-08-10T08:07:40.239207+09:00","type":"EventKey"}
+{"buffer_len":6,"cursor":6,"event":"action","name":"insert","text":"b","time":"2025-08-10T08:07:40.239329+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":"a","time":"2025-08-10T08:07:40.343948+09:00","type":"EventKey"}
+{"buffer_len":7,"cursor":7,"event":"action","name":"insert","text":"a","time":"2025-08-10T08:07:40.344021+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":"n","time":"2025-08-10T08:07:40.48724+09:00","type":"EventKey"}
+{"buffer_len":8,"cursor":8,"event":"action","name":"insert","text":"n","time":"2025-08-10T08:07:40.487529+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":"a","time":"2025-08-10T08:07:40.5748+09:00","type":"EventKey"}
+{"buffer_len":9,"cursor":9,"event":"action","name":"insert","text":"a","time":"2025-08-10T08:07:40.574884+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":"s","time":"2025-08-10T08:07:40.838221+09:00","type":"EventKey"}
+{"buffer_len":10,"cursor":10,"event":"action","name":"insert","text":"s","time":"2025-08-10T08:07:40.838348+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":" ","time":"2025-08-10T08:07:40.974875+09:00","type":"EventKey"}
+{"buffer_len":11,"cursor":11,"event":"action","name":"insert","text":" ","time":"2025-08-10T08:07:40.974915+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":"s","time":"2025-08-10T08:07:41.096619+09:00","type":"EventKey"}
+{"buffer_len":12,"cursor":12,"event":"action","name":"insert","text":"s","time":"2025-08-10T08:07:41.09666+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":" ","time":"2025-08-10T08:07:41.216932+09:00","type":"EventKey"}
+{"buffer_len":13,"cursor":13,"event":"action","name":"insert","text":" ","time":"2025-08-10T08:07:41.217028+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":"e","time":"2025-08-10T08:07:42.339476+09:00","type":"EventKey"}
+{"buffer_len":14,"cursor":14,"event":"action","name":"insert","text":"e","time":"2025-08-10T08:07:42.339605+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":" ","time":"2025-08-10T08:07:42.460667+09:00","type":"EventKey"}
+{"buffer_len":15,"cursor":15,"event":"action","name":"insert","text":" ","time":"2025-08-10T08:07:42.460765+09:00"}
+{"event":"key","key":19,"modifiers":2,"rune":"\u0013","time":"2025-08-10T08:07:44.001451+09:00","type":"EventKey"}
+{"event":"key","key":19,"modifiers":2,"rune":"\u0013","time":"2025-08-10T08:07:44.57172+09:00","type":"EventKey"}
+{"event":"key","key":19,"modifiers":2,"rune":"\u0013","time":"2025-08-10T08:07:44.829681+09:00","type":"EventKey"}
+{"event":"key","key":19,"modifiers":2,"rune":"\u0013","time":"2025-08-10T08:07:45.0209+09:00","type":"EventKey"}
+{"event":"key","key":256,"modifiers":0,"rune":"h","time":"2025-08-10T08:07:45.359393+09:00","type":"EventKey"}
+{"event":"action","name":"help.show","time":"2025-08-10T08:07:45.359432+09:00"}
+{"event":"key","key":256,"modifiers":0,"rune":"h","time":"2025-08-10T08:07:46.003246+09:00","type":"EventKey"}
+{"event":"action","name":"help.show","time":"2025-08-10T08:07:46.003371+09:00"}
+{"event":"key","key":17,"modifiers":2,"rune":"\u0011","time":"2025-08-10T08:07:48.322406+09:00","type":"EventKey"}
+{"event":"action","name":"quit","time":"2025-08-10T08:07:48.322518+09:00"}
+{"event":"run.end","file":"","time":"2025-08-10T08:07:48.322576+09:00"}

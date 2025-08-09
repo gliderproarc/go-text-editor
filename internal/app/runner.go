@@ -29,18 +29,29 @@ func New() *Runner { return &Runner{Buf: buffer.NewGapBuffer(0), History: histor
 
 // LoadFile loads a file into the runner's buffer.
 func (r *Runner) LoadFile(path string) error {
-	if path == "" {
-		return nil
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	r.FilePath = path
-	r.Buf = buffer.NewGapBufferFromString(strings.ReplaceAll(string(data), "\r\n", "\n"))
-	r.Cursor = r.Buf.Len()
-	r.Dirty = false
-	return nil
+    if path == "" {
+        return nil
+    }
+    if r.Logger != nil {
+        r.Logger.Event("open.attempt", map[string]any{"file": path})
+    }
+    data, err := os.ReadFile(path)
+    if err != nil {
+        if r.Logger != nil {
+            r.Logger.Event("open.error", map[string]any{"file": path, "error": err.Error()})
+        }
+        return err
+    }
+    r.FilePath = path
+    // Normalize CRLF to LF for internal buffer storage
+    normalized := strings.ReplaceAll(string(data), "\r\n", "\n")
+    r.Buf = buffer.NewGapBufferFromString(normalized)
+    r.Cursor = r.Buf.Len()
+    r.Dirty = false
+    if r.Logger != nil {
+        r.Logger.Event("open.success", map[string]any{"file": path, "bytes": len(data), "runes": r.Buf.Len()})
+    }
+    return nil
 }
 
 // Save writes the buffer contents to the current FilePath and clears Dirty.
@@ -166,8 +177,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	if ev.Key() == tcell.KeyCtrlQ {
 		return true
 	}
-    // Ctrl+S -> save
-    if ev.Key() == tcell.KeyRune && ev.Rune() == 's' && ev.Modifiers() == tcell.ModCtrl {
+    // Ctrl+S -> save (handle both rune+Ctrl and dedicated control key)
+    if (ev.Key() == tcell.KeyRune && ev.Rune() == 's' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlS {
         if r.FilePath == "" {
             // No file path set; prompt for Save As
             r.runSaveAsPrompt()
@@ -186,8 +197,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
         }
         return false
     }
-    // Ctrl+O -> open file prompt
-    if ev.Key() == tcell.KeyRune && ev.Rune() == 'o' && ev.Modifiers() == tcell.ModCtrl {
+    // Ctrl+O -> open file prompt (handle both rune+Ctrl and dedicated control key)
+    if (ev.Key() == tcell.KeyRune && ev.Rune() == 'o' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlO {
         r.runOpenPrompt()
         if r.Logger != nil {
             r.Logger.Event("action", map[string]any{"name": "open.prompt"})
@@ -245,8 +256,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
         }
         return false
     }
-    // Show help on 'h'
-    if ev.Key() == tcell.KeyRune && ev.Rune() == 'h' {
+    // Show help on Ctrl+H (or dedicated control key)
+    if (ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlH {
         r.ShowHelp = true
         if r.Logger != nil {
             r.Logger.Event("action", map[string]any{"name": "help.show"})
@@ -368,22 +379,31 @@ func drawUI(s tcell.Screen) {
 }
 
 func drawHelp(s tcell.Screen) {
-	width, height := s.Size()
-	s.Clear()
-	s.SetStyle(tcell.StyleDefault)
-	lines := []string{
-		"Help:",
-		"- Press Ctrl+Q or 'q' to exit",
-		"- Press 'h' for help",
-	}
-	y := (height - len(lines)) / 2
-	for i, line := range lines {
-		x := (width - len(line)) / 2
-		for j, r := range line {
-			s.SetContent(x+j, y+i, r, nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
-		}
-	}
-	s.Show()
+    width, height := s.Size()
+    s.Clear()
+    s.SetStyle(tcell.StyleDefault)
+    lines := []string{
+        "Help:",
+        "- Ctrl+H: Show this help",
+        "- Ctrl+Q: Quit",
+        "- Ctrl+O: Open file",
+        "- Ctrl+S: Save (Save As if no file)",
+        "- Ctrl+W: Search",
+        "- Alt+G: Go to line",
+        "- Ctrl+K: Cut line",
+        "- Ctrl+U: Paste",
+        "- Ctrl+Z / Ctrl+Y: Undo / Redo",
+        "- Enter: New line; Backspace/Delete: Remove",
+        "- Typing: Inserts characters",
+    }
+    y := (height - len(lines)) / 2
+    for i, line := range lines {
+        x := (width - len(line)) / 2
+        for j, r := range line {
+            s.SetContent(x+j, y+i, r, nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
+        }
+    }
+    s.Show()
 }
 
 func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range) {

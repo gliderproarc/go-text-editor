@@ -245,6 +245,7 @@ func TestRunner_LoadFile_NormalizesCRLF(t *testing.T) {
     if err := r.LoadFile(path); err != nil {
         t.Fatalf("LoadFile: %v", err)
     }
+    t.Logf("LoadFile OK: path=%s, buf_len=%d", path, r.Buf.Len())
     if got := r.Buf.String(); got != "a\nb\n" {
         t.Fatalf("expected normalized newlines, got %q", got)
     }
@@ -270,4 +271,64 @@ func TestRunner_SaveAs_WritesAndClearsDirty(t *testing.T) {
     if string(data) != "ab" { t.Fatalf("expected 'ab', got %q", string(data)) }
     if r.Dirty { t.Fatalf("expected Dirty=false after save") }
     if r.FilePath != path { t.Fatalf("expected FilePath %q, got %q", path, r.FilePath) }
+}
+
+// TestRun_OpenFilePrompt_Simulation verifies that pressing Ctrl+O opens the
+// prompt; typing a valid path and pressing Enter loads the file into the buffer.
+func TestRun_OpenFilePrompt_Simulation(t *testing.T) {
+    // Prepare a temp file to open
+    tf, err := os.CreateTemp("", "texteditor_open_*")
+    if err != nil {
+        t.Fatalf("create temp: %v", err)
+    }
+    path := tf.Name()
+    content := "hello\nworld\n"
+    if _, err := tf.WriteString(content); err != nil {
+        t.Fatalf("write temp: %v", err)
+    }
+    _ = tf.Close()
+    defer os.Remove(path)
+
+    // Set up simulation screen
+    s := tcell.NewSimulationScreen("UTF-8")
+    if err := s.Init(); err != nil {
+        t.Fatalf("init sim screen: %v", err)
+    }
+    defer s.Fini()
+
+    r := &Runner{Screen: s, Buf: buffer.NewGapBuffer(0), History: history.New()}
+
+    done := make(chan error, 1)
+    go func() { done <- r.Run() }()
+
+    // Give the loop a moment to start
+    time.Sleep(10 * time.Millisecond)
+
+    // Open prompt via dedicated control key (as emitted in real logs)
+    s.PostEvent(tcell.NewEventKey(tcell.KeyCtrlO, 0, 0))
+    // Type the path and press Enter
+    for _, ch := range path {
+        s.PostEvent(tcell.NewEventKey(tcell.KeyRune, ch, 0))
+    }
+    s.PostEvent(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
+
+    // Quit to end the loop
+    s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
+
+    select {
+    case err := <-done:
+        if err != nil {
+            t.Fatalf("runner returned error: %v", err)
+        }
+    case <-time.After(2 * time.Second):
+        t.Fatalf("timeout waiting for runner to quit")
+    }
+
+    // Assert file got loaded (not raw typed path into buffer)
+    if r.FilePath != path {
+        t.Fatalf("expected FilePath=%q after open, got %q", path, r.FilePath)
+    }
+    if got := r.Buf.String(); got != content {
+        t.Fatalf("expected buffer to equal file content, got %q", got)
+    }
 }

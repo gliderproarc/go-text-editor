@@ -56,9 +56,18 @@ func (r *Runner) runOpenPrompt() {
                     errMsg = "path required"
                     continue
                 }
+                if r.Logger != nil {
+                    r.Logger.Event("open.prompt.submit", map[string]any{"file": path})
+                }
                 if err := r.LoadFile(path); err != nil {
                     errMsg = err.Error()
+                    if r.Logger != nil {
+                        r.Logger.Event("open.prompt.error", map[string]any{"file": path, "error": err.Error()})
+                    }
                     continue
+                }
+                if r.Logger != nil {
+                    r.Logger.Event("open.prompt.success", map[string]any{"file": path})
                 }
                 drawBuffer(s, r.Buf, r.FilePath, nil)
                 return

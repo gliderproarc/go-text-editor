@@ -29,8 +29,17 @@ func drawHelp(s tcell.Screen) {
     s.SetStyle(tcell.StyleDefault)
     lines := []string{
         "Help:",
-        "- Press Ctrl+Q or 'q' to exit",
-        "- Press 'h' for help",
+        "- Ctrl+H: Show this help",
+        "- Ctrl+Q: Quit",
+        "- Ctrl+O: Open file",
+        "- Ctrl+S: Save (Save As if no file)",
+        "- Ctrl+W: Search",
+        "- Alt+G: Go to line",
+        "- Ctrl+K: Cut line",
+        "- Ctrl+U: Paste",
+        "- Ctrl+Z / Ctrl+Y: Undo / Redo",
+        "- Enter: New line; Backspace/Delete: Remove",
+        "- Typing: Inserts characters",
     }
     y := (height - len(lines)) / 2
     for i, line := range lines {
@@ -41,4 +50,3 @@ func drawHelp(s tcell.Screen) {
     }
     s.Show()
 }
-
