@@ -6,3 +6,5 @@
 # Local binaries
 /texteditor
 
+# Logs
+*.log
