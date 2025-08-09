@@ -1,2 +1,16 @@
 this is the text in the test file
 ey as. tats works
+
+lets see if this
+
+So the save works but there is no dialouge to show a save was done, the help menu doesn't show up anymore, but the open save and quit all work
+
+This is a test 
+
+Okay test time
+
+go build -o texteditor ./cmd/texteditor
+
+oh wow paste works
+
+ha noline change. So no curose position. But that is fine 

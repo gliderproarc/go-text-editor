@@ -29,14 +29,15 @@ func TestHandleKeyEvent_CtrlQ_Key(t *testing.T) {
 }
 
 func TestHandleKeyEvent_ShowHelp(t *testing.T) {
-	r := &Runner{}
-	ev := tcell.NewEventKey(tcell.KeyRune, 'h', 0)
-	if r.handleKeyEvent(ev) {
-		t.Fatalf("h should not signal quit")
-	}
-	if !r.ShowHelp {
-		t.Fatalf("expected ShowHelp to be set after pressing h")
-	}
+    r := &Runner{}
+    // Prefer F1 which is not terminal-dependent
+    ev := tcell.NewEventKey(tcell.KeyF1, 0, 0)
+    if r.handleKeyEvent(ev) {
+        t.Fatalf("F1 should not signal quit")
+    }
+    if !r.ShowHelp {
+        t.Fatalf("expected ShowHelp to be set after F1")
+    }
 }
 
 func TestRunner_InsertAndSave(t *testing.T) {

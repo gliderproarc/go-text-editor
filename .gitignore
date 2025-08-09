@@ -1,0 +1,8 @@
+# Go build/module caches (accidentally committed previously)
+/.gocache/
+/.gomodcache/
+/.gotmp/
+
+# Local binaries
+/texteditor
+

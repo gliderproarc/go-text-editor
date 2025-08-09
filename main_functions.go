@@ -29,7 +29,8 @@ func drawHelp(s tcell.Screen) {
     s.SetStyle(tcell.StyleDefault)
     lines := []string{
         "Help:",
-        "- Ctrl+H: Show this help",
+        "- F1: Show this help (recommended)",
+        "- Ctrl+H: Show help (if terminal supports)",
         "- Ctrl+Q: Quit",
         "- Ctrl+O: Open file",
         "- Ctrl+S: Save (Save As if no file)",

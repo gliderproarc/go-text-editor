@@ -125,23 +125,16 @@ func (r *Runner) Run() error {
 	for {
 		ev := r.Screen.PollEvent()
 		switch ev := ev.(type) {
-        case *tcell.EventKey:
-            if r.Logger != nil {
-                r.Logger.Event("key", map[string]any{
-                    "type":      "EventKey",
-                    "key":       int(ev.Key()),
-                    "rune":      string(ev.Rune()),
-                    "modifiers": int(ev.Modifiers()),
-                })
-            }
-            // If handleKeyEvent returns true, we should quit
-            if r.handleKeyEvent(ev) {
-                if r.Logger != nil {
-                    r.Logger.Event("action", map[string]any{"name": "quit"})
-                }
-                return nil
-            }
-			// If we were showing help, any key dismisses it and we redraw
+		case *tcell.EventKey:
+			if r.Logger != nil {
+				r.Logger.Event("key", map[string]any{
+					"type":      "EventKey",
+					"key":       int(ev.Key()),
+					"rune":      string(ev.Rune()),
+					"modifiers": int(ev.Modifiers()),
+				})
+			}
+			// If help is currently shown, consume this key to dismiss it
 			if r.ShowHelp {
 				r.ShowHelp = false
 				if r.Buf != nil && r.Buf.Len() > 0 {
@@ -150,6 +143,13 @@ func (r *Runner) Run() error {
 					drawUI(r.Screen)
 				}
 				continue
+			}
+			// Otherwise, handle the key normally; if it requests quit, exit
+			if r.handleKeyEvent(ev) {
+				if r.Logger != nil {
+					r.Logger.Event("action", map[string]any{"name": "quit"})
+				}
+				return nil
 			}
 		case *tcell.EventResize:
 			r.Screen.Sync()
@@ -256,8 +256,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
         }
         return false
     }
-    // Show help on Ctrl+H (or dedicated control key)
-    if (ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlH {
+    // Show help on F1 or Ctrl+H (note: many terminals map Ctrl+H to Backspace)
+    if ev.Key() == tcell.KeyF1 || (ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlH {
         r.ShowHelp = true
         if r.Logger != nil {
             r.Logger.Event("action", map[string]any{"name": "help.show"})
@@ -384,7 +384,8 @@ func drawHelp(s tcell.Screen) {
     s.SetStyle(tcell.StyleDefault)
     lines := []string{
         "Help:",
-        "- Ctrl+H: Show this help",
+        "- F1: Show this help (recommended)",
+        "- Ctrl+H: Show help (if terminal supports)",
         "- Ctrl+Q: Quit",
         "- Ctrl+O: Open file",
         "- Ctrl+S: Save (Save As if no file)",
