@@ -23,7 +23,7 @@ func (r *Runner) runSearchPrompt() {
 			ranges = search.SearchAll(text, query)
 		}
 		// redraw buffer (with highlights) and draw prompt
-		drawBuffer(s, r.Buf, r.FilePath, ranges)
+		drawBuffer(s, r.Buf, r.FilePath, ranges, r.Cursor)
 		_, height := s.Size()
 		prompt := "Search: " + query
 		for i, ch := range prompt {
@@ -37,7 +37,7 @@ func (r *Runner) runSearchPrompt() {
 			// Cancel
 			if ev.Key() == tcell.KeyEsc {
 				// redraw main view without highlights
-				drawBuffer(s, r.Buf, r.FilePath, nil)
+				drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor)
 				return
 			}
 			// Accept
@@ -58,7 +58,7 @@ func (r *Runner) runSearchPrompt() {
 					// move cursor to start of match (convert bytes->runes)
 					r.Cursor = byteOffsetToRuneIndex(text, ranges[idx].Start)
 					// after jumping we redraw and return
-					drawBuffer(s, r.Buf, r.FilePath, nil)
+					drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor)
 					return
 				}
 			}

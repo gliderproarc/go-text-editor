@@ -117,7 +117,7 @@ func (r *Runner) Run() error {
 
 	// initial draw
 	if r.Buf != nil && r.Buf.Len() > 0 {
-		drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+		drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 	} else {
 		drawUI(r.Screen)
 	}
@@ -138,7 +138,7 @@ func (r *Runner) Run() error {
 			if r.ShowHelp {
 				r.ShowHelp = false
 				if r.Buf != nil && r.Buf.Len() > 0 {
-					drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+					drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 				} else {
 					drawUI(r.Screen)
 				}
@@ -157,7 +157,7 @@ func (r *Runner) Run() error {
 				drawHelp(r.Screen)
 			} else {
 				if r.Buf != nil && r.Buf.Len() > 0 {
-					drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+					drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 				} else {
 					drawUI(r.Screen)
 				}
@@ -200,7 +200,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		if r.Screen != nil {
 			if r.Buf != nil && r.Buf.Len() > 0 {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 			} else {
 				drawUI(r.Screen)
 			}
@@ -216,7 +216,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "undo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 			}
 		}
 		return false
@@ -230,7 +230,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "redo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 			}
 		}
 		return false
@@ -271,7 +271,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Logger.Event("action", map[string]any{"name": "insert", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 		}
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 		}
 		return false
 	}
@@ -286,7 +286,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "backspace", "deleted": del, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 			}
 		}
 		return false
@@ -301,7 +301,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "delete", "deleted": del, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 			}
 		}
 		return false
@@ -314,7 +314,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Logger.Event("action", map[string]any{"name": "newline", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 		}
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 		}
 		return false
 	}
@@ -332,7 +332,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			// Move cursor to start (now at next line)
 			r.Cursor = start
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 			}
 		}
 		return false
@@ -346,7 +346,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "yank", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
 			}
 		}
 		return false
@@ -431,20 +431,20 @@ func (r *Runner) showDialog(message string) {
 		}
 	}
 	if r.Buf != nil && r.Buf.Len() > 0 {
-		drawBuffer(s, r.Buf, r.FilePath, nil)
+		drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor)
 	} else {
 		drawUI(s)
 	}
 }
 
-func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range) {
+func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int) {
 	if buf == nil {
-		drawFile(s, fname, []string{}, highlights)
+		drawFile(s, fname, []string{}, highlights, cursor)
 		return
 	}
 	content := buf.String()
 	lines := strings.Split(content, "\n")
-	drawFile(s, fname, lines, highlights)
+	drawFile(s, fname, lines, highlights, cursor)
 }
 
 // insertText inserts text at the current cursor, records history, and updates state.
@@ -499,14 +499,16 @@ func (r *Runner) currentLineBounds() (start, end int) {
 	return r.Buf.LineAt(line)
 }
 
-func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range) {
+func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int) {
 	width, height := s.Size()
 	s.Clear()
 	maxLines := height - 1
 	if maxLines < 0 {
 		maxLines = 0
 	}
-	lineStart := 0 // byte offset of start of current line
+	lineStart := 0     // byte offset of start of current line
+	lineStartRune := 0 // rune offset of start of current line
+	cursorStyle := tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite).Attributes(tcell.AttrBlink)
 	for i := 0; i < maxLines && i < len(lines); i++ {
 		line := lines[i]
 		runes := []rune(line)
@@ -549,14 +551,23 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 		}
 		for j := 0; j < width && j < len(runes); j++ {
 			ch := runes[j]
-			if j < len(hl) && hl[j] {
+			runeIdx := lineStartRune + j
+			switch {
+			case runeIdx == cursor:
+				s.SetContent(j, i, ch, nil, cursorStyle)
+			case j < len(hl) && hl[j]:
 				s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorYellow))
-			} else {
+			default:
 				s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
 			}
 		}
-		// advance lineStart by bytes in line + 1 for the newline
+		// if cursor at end of line, draw placeholder cell
+		if lineStartRune+len(runes) == cursor && len(runes) < width {
+			s.SetContent(len(runes), i, ' ', nil, cursorStyle)
+		}
+		// advance offsets by bytes/runes in line + 1 for the newline
 		lineStart += len([]byte(line)) + 1
+		lineStartRune += len(runes) + 1
 	}
 	status := fname + " — Press Ctrl+Q to exit"
 	if len(status) > width {

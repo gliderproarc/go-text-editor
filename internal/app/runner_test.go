@@ -102,7 +102,7 @@ func TestDrawFile_Highlights(t *testing.T) {
 	ranges := search.SearchAll(text, "hello")
 
 	// draw with highlights
-	drawFile(s, "f.txt", lines, ranges)
+	drawFile(s, "f.txt", lines, ranges, -1)
 
 	// check first line "hello" at (0,0..4) is highlighted
 	for x := 0; x < 5; x++ {
