@@ -117,7 +117,7 @@ func (r *Runner) Run() error {
 
 	// initial draw
 	if r.Buf != nil && r.Buf.Len() > 0 {
-		drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+		drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 	} else {
 		drawUI(r.Screen)
 	}
@@ -138,7 +138,7 @@ func (r *Runner) Run() error {
 			if r.ShowHelp {
 				r.ShowHelp = false
 				if r.Buf != nil && r.Buf.Len() > 0 {
-					drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+					drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 				} else {
 					drawUI(r.Screen)
 				}
@@ -157,7 +157,7 @@ func (r *Runner) Run() error {
 				drawHelp(r.Screen)
 			} else {
 				if r.Buf != nil && r.Buf.Len() > 0 {
-					drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+					drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 				} else {
 					drawUI(r.Screen)
 				}
@@ -200,7 +200,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		if r.Screen != nil {
 			if r.Buf != nil && r.Buf.Len() > 0 {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 			} else {
 				drawUI(r.Screen)
 			}
@@ -216,7 +216,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "undo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 			}
 		}
 		return false
@@ -230,7 +230,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "redo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 			}
 		}
 		return false
@@ -269,7 +269,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Cursor--
 		}
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 		}
 		return false
 	}
@@ -278,21 +278,21 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Cursor++
 		}
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 		}
 		return false
 	}
 	if ev.Key() == tcell.KeyUp || (ev.Key() == tcell.KeyRune && ev.Rune() == 'p' && ev.Modifiers() == tcell.ModCtrl) {
 		r.moveCursorVertical(-1)
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 		}
 		return false
 	}
 	if ev.Key() == tcell.KeyDown || (ev.Key() == tcell.KeyRune && ev.Rune() == 'n' && ev.Modifiers() == tcell.ModCtrl) {
 		r.moveCursorVertical(1)
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 		}
 		return false
 	}
@@ -305,7 +305,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Logger.Event("action", map[string]any{"name": "insert", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 		}
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 		}
 		return false
 	}
@@ -320,7 +320,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "backspace", "deleted": del, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 			}
 		}
 		return false
@@ -335,7 +335,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "delete", "deleted": del, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 			}
 		}
 		return false
@@ -348,7 +348,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Logger.Event("action", map[string]any{"name": "newline", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 		}
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 		}
 		return false
 	}
@@ -366,7 +366,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			// Move cursor to start (now at next line)
 			r.Cursor = start
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 			}
 		}
 		return false
@@ -380,7 +380,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "yank", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 			}
 		}
 		return false
@@ -437,25 +437,29 @@ func drawHelp(s tcell.Screen) {
 	s.Show()
 }
 
-// showDialog displays a centered message with a status bar prompt and waits
-// for a key press. After dismissal it redraws the current buffer or default UI.
+// showDialog displays a message on the status bar and waits for a key press.
+// After dismissal it redraws the current buffer or default UI.
 func (r *Runner) showDialog(message string) {
 	if r.Screen == nil {
 		return
 	}
 	s := r.Screen
 	width, height := s.Size()
-	s.Clear()
-	msgX := (width - len(message)) / 2
-	msgY := height / 2
-	for i, ch := range message {
-		s.SetContent(msgX+i, msgY, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
+	// clear status line
+	for i := 0; i < width; i++ {
+		s.SetContent(i, height-1, ' ', nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite))
 	}
-	status := "Press any key to continue"
-	sbX := (width - len(status)) / 2
-	sbY := height - 1
-	for i, ch := range status {
-		s.SetContent(sbX+i, sbY, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite))
+	msg := message + " — Press any key to continue"
+	start := (width - len([]rune(msg))) / 2
+	if start < 0 {
+		start = 0
+	}
+	idx := 0
+	for _, ch := range msg {
+		if start+idx < width {
+			s.SetContent(start+idx, height-1, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite))
+		}
+		idx++
 	}
 	s.Show()
 	for {
@@ -466,20 +470,20 @@ func (r *Runner) showDialog(message string) {
 		}
 	}
 	if r.Buf != nil && r.Buf.Len() > 0 {
-		drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor)
+		drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 	} else {
 		drawUI(s)
 	}
 }
 
-func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int) {
+func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool) {
 	if buf == nil {
-		drawFile(s, fname, []string{}, highlights, cursor)
+		drawFile(s, fname, []string{}, highlights, cursor, dirty)
 		return
 	}
 	content := buf.String()
 	lines := strings.Split(content, "\n")
-	drawFile(s, fname, lines, highlights, cursor)
+	drawFile(s, fname, lines, highlights, cursor, dirty)
 }
 
 // insertText inserts text at the current cursor, records history, and updates state.
@@ -559,7 +563,7 @@ func (r *Runner) currentLineBounds() (start, end int) {
 	return r.Buf.LineAt(line)
 }
 
-func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int) {
+func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool) {
 	width, height := s.Size()
 	s.Clear()
 	maxLines := height - 1
@@ -629,7 +633,14 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 		lineStart += len([]byte(line)) + 1
 		lineStartRune += len(runes) + 1
 	}
-	status := fname + " — Press Ctrl+Q to exit"
+	display := fname
+	if display == "" {
+		display = "[No File]"
+	}
+	if dirty {
+		display += " [+]"
+	}
+	status := display + " — Press Ctrl+Q to exit"
 	if len(status) > width {
 		status = string([]rune(status)[:width])
 	}

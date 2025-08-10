@@ -15,7 +15,7 @@ func (r *Runner) runOpenPrompt() {
 	errMsg := ""
 	for {
 		// redraw buffer and draw prompt/status
-		drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor)
+		drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 		width, height := s.Size()
 		// Clear status line
 		for i := 0; i < width; i++ {
@@ -46,7 +46,7 @@ func (r *Runner) runOpenPrompt() {
 		case *tcell.EventKey:
 			// Cancel
 			if ev.Key() == tcell.KeyEsc {
-				drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor)
+				drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 				return
 			}
 			// Accept
@@ -69,7 +69,7 @@ func (r *Runner) runOpenPrompt() {
 				if r.Logger != nil {
 					r.Logger.Event("open.prompt.success", map[string]any{"file": path})
 				}
-				drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor)
+				drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
 				return
 			}
 			// Backspace

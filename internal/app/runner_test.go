@@ -138,7 +138,7 @@ func TestDrawFile_Highlights(t *testing.T) {
 	ranges := search.SearchAll(text, "hello")
 
 	// draw with highlights
-	drawFile(s, "f.txt", lines, ranges, -1)
+	drawFile(s, "f.txt", lines, ranges, -1, false)
 
 	// check first line "hello" at (0,0..4) is highlighted
 	for x := 0; x < 5; x++ {
@@ -161,6 +161,26 @@ func TestDrawFile_Highlights(t *testing.T) {
 		expStyle := tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorYellow)
 		if style != expStyle {
 			t.Fatalf("expected highlighted style at (%d,1) got %v", x, style)
+		}
+	}
+}
+
+func TestDrawBuffer_DirtyIndicator(t *testing.T) {
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("initializing simulation screen failed: %v", err)
+	}
+	defer s.Fini()
+
+	buf := buffer.NewGapBufferFromString("hello")
+	drawBuffer(s, buf, "f.txt", nil, 0, true)
+
+	_, height := s.Size()
+	expected := "f.txt [+] — Press Ctrl+Q to exit"
+	for i, r := range expected {
+		cr, _, _, _ := s.GetContent(i, height-1)
+		if cr != r {
+			t.Fatalf("expected status %q, got mismatch at %d: %q", expected, i, string(cr))
 		}
 	}
 }
