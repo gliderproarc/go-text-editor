@@ -17,7 +17,7 @@ func (r *Runner) runGoToPrompt() {
 	input := ""
 	for {
 		// redraw buffer and draw prompt
-		drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+		r.draw(nil)
 		_, height := s.Size()
 		prompt := "Go to line: " + input
 		for i, ch := range prompt {
@@ -29,7 +29,7 @@ func (r *Runner) runGoToPrompt() {
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			if ev.Key() == tcell.KeyEsc {
-				drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+				r.draw(nil)
 				return
 			}
 			if ev.Key() == tcell.KeyEnter {
@@ -59,7 +59,7 @@ func (r *Runner) runGoToPrompt() {
 				}
 				// convert byte offset pos to rune index
 				r.Cursor = byteOffsetToRuneIndex(text, pos)
-				drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+				r.draw(nil)
 				return
 			}
 			if ev.Key() == tcell.KeyBackspace || ev.Key() == tcell.KeyBackspace2 {
