@@ -1,15 +1,15 @@
 package app
 
 import (
-    "os"
-    "strings"
-    "testing"
-    "time"
+	"os"
+	"strings"
+	"testing"
+	"time"
 
-    "example.com/texteditor/pkg/buffer"
-    "example.com/texteditor/pkg/history"
-    "example.com/texteditor/pkg/search"
-    "github.com/gdamore/tcell/v2"
+	"example.com/texteditor/pkg/buffer"
+	"example.com/texteditor/pkg/history"
+	"example.com/texteditor/pkg/search"
+	"github.com/gdamore/tcell/v2"
 )
 
 func TestHandleKeyEvent_CtrlQ_Rune(t *testing.T) {
@@ -29,15 +29,15 @@ func TestHandleKeyEvent_CtrlQ_Key(t *testing.T) {
 }
 
 func TestHandleKeyEvent_ShowHelp(t *testing.T) {
-    r := &Runner{}
-    // Prefer F1 which is not terminal-dependent
-    ev := tcell.NewEventKey(tcell.KeyF1, 0, 0)
-    if r.handleKeyEvent(ev) {
-        t.Fatalf("F1 should not signal quit")
-    }
-    if !r.ShowHelp {
-        t.Fatalf("expected ShowHelp to be set after F1")
-    }
+	r := &Runner{}
+	// Prefer F1 which is not terminal-dependent
+	ev := tcell.NewEventKey(tcell.KeyF1, 0, 0)
+	if r.handleKeyEvent(ev) {
+		t.Fatalf("F1 should not signal quit")
+	}
+	if !r.ShowHelp {
+		t.Fatalf("expected ShowHelp to be set after F1")
+	}
 }
 
 func TestRunner_InsertAndSave(t *testing.T) {
@@ -130,206 +130,221 @@ func TestDrawFile_Highlights(t *testing.T) {
 }
 
 func TestRunner_KillAndYankLine(t *testing.T) {
-    r := &Runner{Buf: buffer.NewGapBufferFromString("one\ntwo\n"), Cursor: 1, History: history.New()}
-    // Ctrl+K to cut current line (line 0)
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'k', tcell.ModCtrl))
-    if got := r.Buf.String(); got != "two\n" {
-        t.Fatalf("expected buffer 'two\\n' after kill, got %q", got)
-    }
-    if !r.KillRing.HasData() || r.KillRing.Get() != "one\n" {
-        t.Fatalf("expected kill ring to contain 'one\\n', got %q", r.KillRing.Get())
-    }
-    // Yank back
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'u', tcell.ModCtrl))
-    if got := r.Buf.String(); got != "one\ntwo\n" {
-        t.Fatalf("expected buffer restored to 'one\\ntwo\\n' after yank, got %q", got)
-    }
+	r := &Runner{Buf: buffer.NewGapBufferFromString("one\ntwo\n"), Cursor: 1, History: history.New()}
+	// Ctrl+K to cut current line (line 0)
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'k', tcell.ModCtrl))
+	if got := r.Buf.String(); got != "two\n" {
+		t.Fatalf("expected buffer 'two\\n' after kill, got %q", got)
+	}
+	if !r.KillRing.HasData() || r.KillRing.Get() != "one\n" {
+		t.Fatalf("expected kill ring to contain 'one\\n', got %q", r.KillRing.Get())
+	}
+	// Yank back
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'u', tcell.ModCtrl))
+	if got := r.Buf.String(); got != "one\ntwo\n" {
+		t.Fatalf("expected buffer restored to 'one\\ntwo\\n' after yank, got %q", got)
+	}
 }
 
 func TestRunner_UndoRedo(t *testing.T) {
-    r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
-    // type 'a', 'b'
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
-    if got := r.Buf.String(); got != "ab" {
-        t.Fatalf("expected 'ab', got %q", got)
-    }
-    // undo -> 'a'
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'z', tcell.ModCtrl))
-    if got := r.Buf.String(); got != "a" {
-        t.Fatalf("expected 'a' after undo, got %q", got)
-    }
-    // undo -> ''
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'z', tcell.ModCtrl))
-    if got := r.Buf.String(); got != "" {
-        t.Fatalf("expected '' after second undo, got %q", got)
-    }
-    // redo -> 'a'
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', tcell.ModCtrl))
-    if got := r.Buf.String(); got != "a" {
-        t.Fatalf("expected 'a' after redo, got %q", got)
-    }
-    // redo -> 'ab'
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', tcell.ModCtrl))
-    if got := r.Buf.String(); got != "ab" {
-        t.Fatalf("expected 'ab' after second redo, got %q", got)
-    }
+	r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
+	// type 'a', 'b'
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
+	if got := r.Buf.String(); got != "ab" {
+		t.Fatalf("expected 'ab', got %q", got)
+	}
+	// undo -> 'a'
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'z', tcell.ModCtrl))
+	if got := r.Buf.String(); got != "a" {
+		t.Fatalf("expected 'a' after undo, got %q", got)
+	}
+	// undo -> ''
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'z', tcell.ModCtrl))
+	if got := r.Buf.String(); got != "" {
+		t.Fatalf("expected '' after second undo, got %q", got)
+	}
+	// redo -> 'a'
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', tcell.ModCtrl))
+	if got := r.Buf.String(); got != "a" {
+		t.Fatalf("expected 'a' after redo, got %q", got)
+	}
+	// redo -> 'ab'
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', tcell.ModCtrl))
+	if got := r.Buf.String(); got != "ab" {
+		t.Fatalf("expected 'ab' after second redo, got %q", got)
+	}
 }
 
 // TestRun_TypingSaveQuit_Simulation reflects README behavior: type directly, save with Ctrl+S, quit with Ctrl+Q.
 func TestRun_TypingSaveQuit_Simulation(t *testing.T) {
-    // Set up simulation screen
-    s := tcell.NewSimulationScreen("UTF-8")
-    if err := s.Init(); err != nil {
-        t.Fatalf("initializing simulation screen failed: %v", err)
-    }
-    defer s.Fini()
+	// Set up simulation screen
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("initializing simulation screen failed: %v", err)
+	}
+	defer s.Fini()
 
-    // Temp file for save
-    tmp, err := os.CreateTemp("", "texteditor_run_*")
-    if err != nil {
-        t.Fatalf("create temp file: %v", err)
-    }
-    tmp.Close()
-    defer os.Remove(tmp.Name())
+	// Temp file for save
+	tmp, err := os.CreateTemp("", "texteditor_run_*")
+	if err != nil {
+		t.Fatalf("create temp file: %v", err)
+	}
+	tmp.Close()
+	defer os.Remove(tmp.Name())
 
-    r := &Runner{Screen: s, Buf: buffer.NewGapBuffer(0), History: history.New(), FilePath: tmp.Name()}
+	r := &Runner{Screen: s, Buf: buffer.NewGapBuffer(0), History: history.New(), FilePath: tmp.Name()}
 
-    done := make(chan error, 1)
-    go func() { done <- r.Run() }()
+	done := make(chan error, 1)
+	go func() { done <- r.Run() }()
 
-    // Give the loop a moment to start
-    time.Sleep(10 * time.Millisecond)
+	// Give the loop a moment to start
+	time.Sleep(10 * time.Millisecond)
 
-    // Type 'a', 'b' (avoid 'h' which opens help per README)
-    s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
-    s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
-    // Save via Ctrl+S
-    s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 's', tcell.ModCtrl))
-    // Quit via Ctrl+Q (use rune+ctrl for portability)
-    s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
+	// Type 'a', 'b' (avoid 'h' which opens help per README)
+	s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
+	s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
+	// Save via Ctrl+S
+	s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 's', tcell.ModCtrl))
+	// Dismiss save dialog
+	s.PostEvent(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
+	// Quit via Ctrl+Q (use rune+ctrl for portability)
+	s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
 
-    select {
-    case err := <-done:
-        if err != nil {
-            t.Fatalf("runner returned error: %v", err)
-        }
-    case <-time.After(2 * time.Second):
-        t.Fatalf("timeout waiting for runner to quit")
-    }
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runner returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for runner to quit")
+	}
 
-    // Verify buffer content and saved file per README expectations
-    if got := r.Buf.String(); got != "ab" {
-        t.Fatalf("expected buffer 'ab', got %q", got)
-    }
-    data, err := os.ReadFile(tmp.Name())
-    if err != nil {
-        t.Fatalf("read saved file: %v", err)
-    }
-    if string(data) != "ab" {
-        t.Fatalf("expected saved content 'ab', got %q", string(data))
-    }
-    if r.Dirty {
-        t.Fatalf("expected Dirty=false after save")
-    }
+	// Verify buffer content and saved file per README expectations
+	if got := r.Buf.String(); got != "ab" {
+		t.Fatalf("expected buffer 'ab', got %q", got)
+	}
+	data, err := os.ReadFile(tmp.Name())
+	if err != nil {
+		t.Fatalf("read saved file: %v", err)
+	}
+	if string(data) != "ab" {
+		t.Fatalf("expected saved content 'ab', got %q", string(data))
+	}
+	if r.Dirty {
+		t.Fatalf("expected Dirty=false after save")
+	}
 }
 
 func TestRunner_LoadFile_NormalizesCRLF(t *testing.T) {
-    f, err := os.CreateTemp("", "texteditor_crlf_*")
-    if err != nil { t.Fatalf("create temp: %v", err) }
-    path := f.Name()
-    _, _ = f.WriteString("a\r\nb\r\n")
-    _ = f.Close()
-    defer os.Remove(path)
+	f, err := os.CreateTemp("", "texteditor_crlf_*")
+	if err != nil {
+		t.Fatalf("create temp: %v", err)
+	}
+	path := f.Name()
+	_, _ = f.WriteString("a\r\nb\r\n")
+	_ = f.Close()
+	defer os.Remove(path)
 
-    r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
-    if err := r.LoadFile(path); err != nil {
-        t.Fatalf("LoadFile: %v", err)
-    }
-    t.Logf("LoadFile OK: path=%s, buf_len=%d", path, r.Buf.Len())
-    if got := r.Buf.String(); got != "a\nb\n" {
-        t.Fatalf("expected normalized newlines, got %q", got)
-    }
+	r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
+	if err := r.LoadFile(path); err != nil {
+		t.Fatalf("LoadFile: %v", err)
+	}
+	t.Logf("LoadFile OK: path=%s, buf_len=%d", path, r.Buf.Len())
+	if got := r.Buf.String(); got != "a\nb\n" {
+		t.Fatalf("expected normalized newlines, got %q", got)
+	}
 }
 
 func TestRunner_SaveAs_WritesAndClearsDirty(t *testing.T) {
-    f, err := os.CreateTemp("", "texteditor_saveas_*")
-    if err != nil { t.Fatalf("create temp: %v", err) }
-    path := f.Name()
-    _ = f.Close()
-    defer os.Remove(path)
+	f, err := os.CreateTemp("", "texteditor_saveas_*")
+	if err != nil {
+		t.Fatalf("create temp: %v", err)
+	}
+	path := f.Name()
+	_ = f.Close()
+	defer os.Remove(path)
 
-    r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
-    // type 'a','b'
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
-    if !r.Dirty { t.Fatalf("expected Dirty after typing") }
-    if err := r.SaveAs(path); err != nil {
-        t.Fatalf("SaveAs: %v", err)
-    }
-    data, err := os.ReadFile(path)
-    if err != nil { t.Fatalf("read saved: %v", err) }
-    if string(data) != "ab" { t.Fatalf("expected 'ab', got %q", string(data)) }
-    if r.Dirty { t.Fatalf("expected Dirty=false after save") }
-    if r.FilePath != path { t.Fatalf("expected FilePath %q, got %q", path, r.FilePath) }
+	r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
+	// type 'a','b'
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
+	if !r.Dirty {
+		t.Fatalf("expected Dirty after typing")
+	}
+	if err := r.SaveAs(path); err != nil {
+		t.Fatalf("SaveAs: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read saved: %v", err)
+	}
+	if string(data) != "ab" {
+		t.Fatalf("expected 'ab', got %q", string(data))
+	}
+	if r.Dirty {
+		t.Fatalf("expected Dirty=false after save")
+	}
+	if r.FilePath != path {
+		t.Fatalf("expected FilePath %q, got %q", path, r.FilePath)
+	}
 }
 
 // TestRun_OpenFilePrompt_Simulation verifies that pressing Ctrl+O opens the
 // prompt; typing a valid path and pressing Enter loads the file into the buffer.
 func TestRun_OpenFilePrompt_Simulation(t *testing.T) {
-    // Prepare a temp file to open
-    tf, err := os.CreateTemp("", "texteditor_open_*")
-    if err != nil {
-        t.Fatalf("create temp: %v", err)
-    }
-    path := tf.Name()
-    content := "hello\nworld\n"
-    if _, err := tf.WriteString(content); err != nil {
-        t.Fatalf("write temp: %v", err)
-    }
-    _ = tf.Close()
-    defer os.Remove(path)
+	// Prepare a temp file to open
+	tf, err := os.CreateTemp("", "texteditor_open_*")
+	if err != nil {
+		t.Fatalf("create temp: %v", err)
+	}
+	path := tf.Name()
+	content := "hello\nworld\n"
+	if _, err := tf.WriteString(content); err != nil {
+		t.Fatalf("write temp: %v", err)
+	}
+	_ = tf.Close()
+	defer os.Remove(path)
 
-    // Set up simulation screen
-    s := tcell.NewSimulationScreen("UTF-8")
-    if err := s.Init(); err != nil {
-        t.Fatalf("init sim screen: %v", err)
-    }
-    defer s.Fini()
+	// Set up simulation screen
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("init sim screen: %v", err)
+	}
+	defer s.Fini()
 
-    r := &Runner{Screen: s, Buf: buffer.NewGapBuffer(0), History: history.New()}
+	r := &Runner{Screen: s, Buf: buffer.NewGapBuffer(0), History: history.New()}
 
-    done := make(chan error, 1)
-    go func() { done <- r.Run() }()
+	done := make(chan error, 1)
+	go func() { done <- r.Run() }()
 
-    // Give the loop a moment to start
-    time.Sleep(10 * time.Millisecond)
+	// Give the loop a moment to start
+	time.Sleep(10 * time.Millisecond)
 
-    // Open prompt via dedicated control key (as emitted in real logs)
-    s.PostEvent(tcell.NewEventKey(tcell.KeyCtrlO, 0, 0))
-    // Type the path and press Enter
-    for _, ch := range path {
-        s.PostEvent(tcell.NewEventKey(tcell.KeyRune, ch, 0))
-    }
-    s.PostEvent(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
+	// Open prompt via dedicated control key (as emitted in real logs)
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyCtrlO, 0, 0))
+	// Type the path and press Enter
+	for _, ch := range path {
+		s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, ch, 0))
+	}
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
+	// Quit to end the loop
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
 
-    // Quit to end the loop
-    s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runner returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for runner to quit")
+	}
 
-    select {
-    case err := <-done:
-        if err != nil {
-            t.Fatalf("runner returned error: %v", err)
-        }
-    case <-time.After(2 * time.Second):
-        t.Fatalf("timeout waiting for runner to quit")
-    }
-
-    // Assert file got loaded (not raw typed path into buffer)
-    if r.FilePath != path {
-        t.Fatalf("expected FilePath=%q after open, got %q", path, r.FilePath)
-    }
-    if got := r.Buf.String(); got != content {
-        t.Fatalf("expected buffer to equal file content, got %q", got)
-    }
+	// Assert file got loaded (not raw typed path into buffer)
+	if r.FilePath != path {
+		t.Fatalf("expected FilePath=%q after open, got %q", path, r.FilePath)
+	}
+	if got := r.Buf.String(); got != content {
+		t.Fatalf("expected buffer to equal file content, got %q", got)
+	}
 }
