@@ -591,6 +591,31 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 		r.VisualStart = -1
 		r.draw(nil)
 		return false
+	case ev.Key() == tcell.KeyRune && ev.Rune() == 'p' && ev.Modifiers() == 0:
+		if r.Buf != nil && r.KillRing.HasData() {
+			start := r.VisualStart
+			end := r.Cursor
+			if start > end {
+				start, end = end, start
+			}
+			if start < end {
+				// remove current selection
+				removed := string(r.Buf.Slice(start, end))
+				_ = r.deleteRange(start, end, removed)
+				r.Cursor = start
+			} else {
+				r.Cursor = start
+			}
+			text := r.KillRing.Get()
+			r.insertText(text)
+			if r.Logger != nil {
+				r.Logger.Event("action", map[string]any{"name": "paste.visual", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+			}
+		}
+		r.Mode = ModeInsert
+		r.VisualStart = -1
+		r.draw(nil)
+		return false
 	}
 	// ignore other keys in visual mode
 	return false
