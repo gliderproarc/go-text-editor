@@ -11,21 +11,33 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
+// Mode represents the current editor mode.
+type Mode int
+
+const (
+	ModeInsert Mode = iota
+	ModeVisual
+)
+
 // Runner owns the terminal lifecycle and a minimal event loop.
 type Runner struct {
-	Screen   tcell.Screen
-	FilePath string
-	Buf      *buffer.GapBuffer
-	Cursor   int // cursor position in runes
-	Dirty    bool
-	ShowHelp bool
-	History  *history.History
-	KillRing history.KillRing
-	Logger   *logs.Logger
+	Screen      tcell.Screen
+	FilePath    string
+	Buf         *buffer.GapBuffer
+	Cursor      int // cursor position in runes
+	Dirty       bool
+	ShowHelp    bool
+	Mode        Mode
+	VisualStart int
+	History     *history.History
+	KillRing    history.KillRing
+	Logger      *logs.Logger
 }
 
 // New creates an empty Runner.
-func New() *Runner { return &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()} }
+func New() *Runner {
+	return &Runner{Buf: buffer.NewGapBuffer(0), History: history.New(), Mode: ModeInsert, VisualStart: -1}
+}
 
 // LoadFile loads a file into the runner's buffer.
 func (r *Runner) LoadFile(path string) error {
@@ -117,7 +129,7 @@ func (r *Runner) Run() error {
 
 	// initial draw
 	if r.Buf != nil && r.Buf.Len() > 0 {
-		drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+		r.draw(nil)
 	} else {
 		drawUI(r.Screen)
 	}
@@ -138,7 +150,7 @@ func (r *Runner) Run() error {
 			if r.ShowHelp {
 				r.ShowHelp = false
 				if r.Buf != nil && r.Buf.Len() > 0 {
-					drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+					r.draw(nil)
 				} else {
 					drawUI(r.Screen)
 				}
@@ -157,7 +169,7 @@ func (r *Runner) Run() error {
 				drawHelp(r.Screen)
 			} else {
 				if r.Buf != nil && r.Buf.Len() > 0 {
-					drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+					r.draw(nil)
 				} else {
 					drawUI(r.Screen)
 				}
@@ -169,6 +181,18 @@ func (r *Runner) Run() error {
 // handleKeyEvent processes a key event. It returns true if the event signals
 // the runner should quit.
 func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
+	// Toggle visual mode on Escape
+	if ev.Key() == tcell.KeyEsc {
+		if r.Mode == ModeVisual {
+			r.Mode = ModeInsert
+			r.VisualStart = -1
+		} else {
+			r.Mode = ModeVisual
+			r.VisualStart = r.Cursor
+		}
+		r.draw(nil)
+		return false
+	}
 	// Ctrl+Q via rune + Ctrl
 	if ev.Key() == tcell.KeyRune && ev.Rune() == 'q' && ev.Modifiers() == tcell.ModCtrl {
 		return true
@@ -200,7 +224,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		if r.Screen != nil {
 			if r.Buf != nil && r.Buf.Len() > 0 {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+				r.draw(nil)
 			} else {
 				drawUI(r.Screen)
 			}
@@ -216,7 +240,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "undo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+				r.draw(nil)
 			}
 		}
 		return false
@@ -230,7 +254,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "redo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+				r.draw(nil)
 			}
 		}
 		return false
@@ -263,13 +287,17 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		return false
 	}
 
+	if r.Mode == ModeVisual {
+		return r.handleVisualKey(ev)
+	}
+
 	// Arrow keys and basic cursor movement (Ctrl+B/F for left/right, Ctrl+P/N for up/down)
 	if ev.Key() == tcell.KeyLeft || (ev.Key() == tcell.KeyRune && ev.Rune() == 'b' && ev.Modifiers() == tcell.ModCtrl) {
 		if r.Cursor > 0 {
 			r.Cursor--
 		}
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+			r.draw(nil)
 		}
 		return false
 	}
@@ -278,21 +306,21 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Cursor++
 		}
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+			r.draw(nil)
 		}
 		return false
 	}
 	if ev.Key() == tcell.KeyUp || (ev.Key() == tcell.KeyRune && ev.Rune() == 'p' && ev.Modifiers() == tcell.ModCtrl) {
 		r.moveCursorVertical(-1)
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+			r.draw(nil)
 		}
 		return false
 	}
 	if ev.Key() == tcell.KeyDown || (ev.Key() == tcell.KeyRune && ev.Rune() == 'n' && ev.Modifiers() == tcell.ModCtrl) {
 		r.moveCursorVertical(1)
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+			r.draw(nil)
 		}
 		return false
 	}
@@ -305,7 +333,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Logger.Event("action", map[string]any{"name": "insert", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 		}
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+			r.draw(nil)
 		}
 		return false
 	}
@@ -320,7 +348,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "backspace", "deleted": del, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+				r.draw(nil)
 			}
 		}
 		return false
@@ -335,7 +363,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "delete", "deleted": del, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+				r.draw(nil)
 			}
 		}
 		return false
@@ -348,7 +376,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Logger.Event("action", map[string]any{"name": "newline", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 		}
 		if r.Screen != nil {
-			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+			r.draw(nil)
 		}
 		return false
 	}
@@ -366,7 +394,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			// Move cursor to start (now at next line)
 			r.Cursor = start
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+				r.draw(nil)
 			}
 		}
 		return false
@@ -380,7 +408,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "yank", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 			if r.Screen != nil {
-				drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+				r.draw(nil)
 			}
 		}
 		return false
@@ -470,7 +498,7 @@ func (r *Runner) showDialog(message string) {
 		}
 	}
 	if r.Buf != nil && r.Buf.Len() > 0 {
-		drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+		r.draw(nil)
 	} else {
 		drawUI(s)
 	}
@@ -484,6 +512,68 @@ func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights 
 	content := buf.String()
 	lines := strings.Split(content, "\n")
 	drawFile(s, fname, lines, highlights, cursor, dirty)
+}
+
+// draw renders the buffer with optional highlights and current visual selection.
+func (r *Runner) draw(highlights []search.Range) {
+	if r.Screen == nil {
+		return
+	}
+	if vh := r.visualHighlightRange(); len(vh) > 0 {
+		highlights = append(highlights, vh...)
+	}
+	drawBuffer(r.Screen, r.Buf, r.FilePath, highlights, r.Cursor, r.Dirty)
+}
+
+// visualHighlightRange returns the current visual selection as byte offsets.
+func (r *Runner) visualHighlightRange() []search.Range {
+	if r.Mode != ModeVisual || r.VisualStart < 0 || r.Buf == nil {
+		return nil
+	}
+	start := r.VisualStart
+	end := r.Cursor
+	if start > end {
+		start, end = end, start
+	}
+	text := r.Buf.String()
+	runes := []rune(text)
+	if start < 0 {
+		start = 0
+	}
+	if end > len(runes) {
+		end = len(runes)
+	}
+	startBytes := len(string(runes[:start]))
+	endBytes := len(string(runes[:end]))
+	return []search.Range{{Start: startBytes, End: endBytes}}
+}
+
+// handleVisualKey processes key events while in visual mode.
+func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
+	switch {
+	case ev.Key() == tcell.KeyLeft || (ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == 0):
+		if r.Cursor > 0 {
+			r.Cursor--
+		}
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyRight || (ev.Key() == tcell.KeyRune && ev.Rune() == 'l' && ev.Modifiers() == 0):
+		if r.Buf != nil && r.Cursor < r.Buf.Len() {
+			r.Cursor++
+		}
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyUp || (ev.Key() == tcell.KeyRune && ev.Rune() == 'k' && ev.Modifiers() == 0):
+		r.moveCursorVertical(-1)
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyDown || (ev.Key() == tcell.KeyRune && ev.Rune() == 'j' && ev.Modifiers() == 0):
+		r.moveCursorVertical(1)
+		r.draw(nil)
+		return false
+	}
+	// ignore other keys in visual mode
+	return false
 }
 
 // insertText inserts text at the current cursor, records history, and updates state.

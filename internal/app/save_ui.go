@@ -25,7 +25,7 @@ func (r *Runner) runSaveAsPrompt() {
 	input := r.FilePath // prefill with current path if any
 	errMsg := ""
 	for {
-		drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+		r.draw(nil)
 		width, height := s.Size()
 		// Clear status line
 		for i := 0; i < width; i++ {
@@ -54,7 +54,7 @@ func (r *Runner) runSaveAsPrompt() {
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			if ev.Key() == tcell.KeyEsc {
-				drawBuffer(s, r.Buf, r.FilePath, nil, r.Cursor, r.Dirty)
+				r.draw(nil)
 				return
 			}
 			if ev.Key() == tcell.KeyEnter {
