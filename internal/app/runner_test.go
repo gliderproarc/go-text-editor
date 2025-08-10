@@ -88,6 +88,42 @@ func TestRunner_BackspaceAndDelete(t *testing.T) {
 	}
 }
 
+func TestRunner_CursorMoveHorizontal(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("ab"), Cursor: 1}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
+	if r.Cursor != 2 {
+		t.Fatalf("expected cursor 2 after right arrow, got %d", r.Cursor)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', tcell.ModCtrl))
+	if r.Cursor != 1 {
+		t.Fatalf("expected cursor 1 after Ctrl+B, got %d", r.Cursor)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'f', tcell.ModCtrl))
+	if r.Cursor != 2 {
+		t.Fatalf("expected cursor 2 after Ctrl+F, got %d", r.Cursor)
+	}
+}
+
+func TestRunner_CursorMoveVertical(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("ab\ncde\nf"), Cursor: 1}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyDown, 0, 0))
+	if r.Cursor != 4 {
+		t.Fatalf("expected cursor 4 after down arrow, got %d", r.Cursor)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'n', tcell.ModCtrl))
+	if r.Cursor != 8 {
+		t.Fatalf("expected cursor 8 after Ctrl+N, got %d", r.Cursor)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyUp, 0, 0))
+	if r.Cursor != 4 {
+		t.Fatalf("expected cursor 4 after up arrow, got %d", r.Cursor)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'p', tcell.ModCtrl))
+	if r.Cursor != 1 {
+		t.Fatalf("expected cursor 1 after Ctrl+P, got %d", r.Cursor)
+	}
+}
+
 func TestDrawFile_Highlights(t *testing.T) {
 	// Use simulation screen
 	s := tcell.NewSimulationScreen("UTF-8")

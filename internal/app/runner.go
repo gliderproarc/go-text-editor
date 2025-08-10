@@ -263,6 +263,40 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		return false
 	}
 
+	// Arrow keys and basic cursor movement (Ctrl+B/F for left/right, Ctrl+P/N for up/down)
+	if ev.Key() == tcell.KeyLeft || (ev.Key() == tcell.KeyRune && ev.Rune() == 'b' && ev.Modifiers() == tcell.ModCtrl) {
+		if r.Cursor > 0 {
+			r.Cursor--
+		}
+		if r.Screen != nil {
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+		}
+		return false
+	}
+	if ev.Key() == tcell.KeyRight || (ev.Key() == tcell.KeyRune && ev.Rune() == 'f' && ev.Modifiers() == tcell.ModCtrl) {
+		if r.Buf != nil && r.Cursor < r.Buf.Len() {
+			r.Cursor++
+		}
+		if r.Screen != nil {
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+		}
+		return false
+	}
+	if ev.Key() == tcell.KeyUp || (ev.Key() == tcell.KeyRune && ev.Rune() == 'p' && ev.Modifiers() == tcell.ModCtrl) {
+		r.moveCursorVertical(-1)
+		if r.Screen != nil {
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+		}
+		return false
+	}
+	if ev.Key() == tcell.KeyDown || (ev.Key() == tcell.KeyRune && ev.Rune() == 'n' && ev.Modifiers() == tcell.ModCtrl) {
+		r.moveCursorVertical(1)
+		if r.Screen != nil {
+			drawBuffer(r.Screen, r.Buf, r.FilePath, nil, r.Cursor)
+		}
+		return false
+	}
+
 	// Insert typed rune (simple handling: any rune with no Ctrl/Alt)
 	if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
 		text := string(ev.Rune())
@@ -389,6 +423,7 @@ func drawHelp(s tcell.Screen) {
 		"- Ctrl+K: Cut line",
 		"- Ctrl+U: Paste",
 		"- Ctrl+Z / Ctrl+Y: Undo / Redo",
+		"- Arrow keys or Ctrl+B/F/P/N: Move cursor",
 		"- Enter: New line; Backspace/Delete: Remove",
 		"- Typing: Inserts characters",
 	}
@@ -485,6 +520,31 @@ func (r *Runner) deleteRange(start, end int, text string) error {
 	}
 	r.Dirty = true
 	return nil
+}
+
+// moveCursorVertical moves the cursor up or down by delta lines, preserving the column when possible.
+func (r *Runner) moveCursorVertical(delta int) {
+	if r.Buf == nil || r.Buf.Len() == 0 {
+		return
+	}
+	line := 0
+	lineStart := 0
+	for i := 0; i < r.Cursor && i < r.Buf.Len(); i++ {
+		if string(r.Buf.Slice(i, i+1)) == "\n" {
+			line++
+			lineStart = i + 1
+		}
+	}
+	col := r.Cursor - lineStart
+	start, end := r.Buf.LineAt(line + delta)
+	lineLen := end - start
+	if lineLen > 0 && string(r.Buf.Slice(end-1, end)) == "\n" {
+		lineLen--
+	}
+	if col > lineLen {
+		col = lineLen
+	}
+	r.Cursor = start + col
 }
 
 // currentLineBounds returns the rune start and end indices for the current cursor's line.
