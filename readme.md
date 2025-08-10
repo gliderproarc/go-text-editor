@@ -4,6 +4,31 @@ A tiny nano-like editor that can grow toward Emacs
 
 Goal: Start with a reliable, minimalist, cross-platform terminal editor (nano clone), then expand toward Emacs-style power via a contextual command menu and a plug-in system.
 
+Parallelization Plan
+--------------------
+To keep the editor responsive as features grow, we will split work between a
+single sequential core and multiple background goroutines.
+
+Sequential core (single goroutine)
+- Maintains the edit log and undo/redo history in order.
+- Owns cursor position and selection state.
+- Applies all edits and command dispatch so changes occur deterministically.
+
+Concurrent subsystems (worker goroutines)
+- Rendering, file I/O, search/indexing, plug‑in host, and other background
+  analysis.
+- Workers communicate with the core through typed channels and operate on
+  snapshots of editor state. They never mutate core state directly.
+
+Integration guidelines
+- Offload long‑running tasks to workers and report results back as commands.
+- Keep data structures copy‑on‑write or immutable when shared across threads.
+- Log every edit through the sequential core to preserve ordering for future
+  replay or collaboration features.
+
+This approach lets most of the application run in parallel while guaranteeing
+that the edit history and cursor/selection remain consistent.
+
 ⸻
 
 0) Quick Start (for the coding agent)
