@@ -504,14 +504,14 @@ func (r *Runner) showDialog(message string) {
 	}
 }
 
-func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool) {
+func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool, mode Mode) {
 	if buf == nil {
-		drawFile(s, fname, []string{}, highlights, cursor, dirty)
+		drawFile(s, fname, []string{}, highlights, cursor, dirty, mode)
 		return
 	}
 	content := buf.String()
 	lines := strings.Split(content, "\n")
-	drawFile(s, fname, lines, highlights, cursor, dirty)
+	drawFile(s, fname, lines, highlights, cursor, dirty, mode)
 }
 
 // draw renders the buffer with optional highlights and current visual selection.
@@ -522,7 +522,7 @@ func (r *Runner) draw(highlights []search.Range) {
 	if vh := r.visualHighlightRange(); len(vh) > 0 {
 		highlights = append(highlights, vh...)
 	}
-	drawBuffer(r.Screen, r.Buf, r.FilePath, highlights, r.Cursor, r.Dirty)
+	drawBuffer(r.Screen, r.Buf, r.FilePath, highlights, r.Cursor, r.Dirty, r.Mode)
 }
 
 // visualHighlightRange returns the current visual selection as byte offsets.
@@ -569,6 +569,26 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 		return false
 	case ev.Key() == tcell.KeyDown || (ev.Key() == tcell.KeyRune && ev.Rune() == 'j' && ev.Modifiers() == 0):
 		r.moveCursorVertical(1)
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyRune && ev.Rune() == 'y' && ev.Modifiers() == 0:
+		if r.Buf != nil {
+			start := r.VisualStart
+			end := r.Cursor
+			if start > end {
+				start, end = end, start
+			}
+			if start < end {
+				text := string(r.Buf.Slice(start, end))
+				r.KillRing.Set(text)
+				if r.Logger != nil {
+					r.Logger.Event("action", map[string]any{"name": "yank.visual", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+				}
+				r.Cursor = start
+			}
+		}
+		r.Mode = ModeInsert
+		r.VisualStart = -1
 		r.draw(nil)
 		return false
 	}
@@ -653,7 +673,7 @@ func (r *Runner) currentLineBounds() (start, end int) {
 	return r.Buf.LineAt(line)
 }
 
-func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool) {
+func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode) {
 	width, height := s.Size()
 	s.Clear()
 	maxLines := height - 1
@@ -662,7 +682,11 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 	}
 	lineStart := 0     // byte offset of start of current line
 	lineStartRune := 0 // rune offset of start of current line
-	cursorStyle := tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite).Attributes(tcell.AttrBlink)
+	cursorColor := tcell.ColorWhite
+	if mode == ModeInsert {
+		cursorColor = tcell.ColorBlue
+	}
+	cursorStyle := tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(cursorColor).Attributes(tcell.AttrBlink)
 	for i := 0; i < maxLines && i < len(lines); i++ {
 		line := lines[i]
 		runes := []rune(line)

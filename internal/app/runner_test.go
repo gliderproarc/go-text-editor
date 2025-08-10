@@ -138,7 +138,7 @@ func TestDrawFile_Highlights(t *testing.T) {
 	ranges := search.SearchAll(text, "hello")
 
 	// draw with highlights
-	drawFile(s, "f.txt", lines, ranges, -1, false)
+	drawFile(s, "f.txt", lines, ranges, -1, false, ModeInsert)
 
 	// check first line "hello" at (0,0..4) is highlighted
 	for x := 0; x < 5; x++ {
@@ -173,7 +173,7 @@ func TestDrawBuffer_DirtyIndicator(t *testing.T) {
 	defer s.Fini()
 
 	buf := buffer.NewGapBufferFromString("hello")
-	drawBuffer(s, buf, "f.txt", nil, 0, true)
+	drawBuffer(s, buf, "f.txt", nil, 0, true, ModeInsert)
 
 	_, height := s.Size()
 	expected := "f.txt [+] — Press Ctrl+Q to exit"
@@ -199,6 +199,32 @@ func TestRunner_KillAndYankLine(t *testing.T) {
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'u', tcell.ModCtrl))
 	if got := r.Buf.String(); got != "one\ntwo\n" {
 		t.Fatalf("expected buffer restored to 'one\\ntwo\\n' after yank, got %q", got)
+	}
+}
+
+func TestRunner_VisualYank(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), Cursor: 1, History: history.New()}
+	// Enter visual mode
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	// Extend selection to include "el"
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
+	// Yank selection
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', 0))
+	if got := r.KillRing.Get(); got != "el" {
+		t.Fatalf("expected kill ring to contain 'el', got %q", got)
+	}
+	if r.Mode != ModeInsert {
+		t.Fatalf("expected mode to return to insert after yank")
+	}
+	if r.VisualStart != -1 {
+		t.Fatalf("expected visual start reset after yank")
+	}
+	if r.Buf.String() != "hello" {
+		t.Fatalf("buffer should remain unchanged after yank, got %q", r.Buf.String())
+	}
+	if r.Cursor != 1 {
+		t.Fatalf("expected cursor at start of selection after yank, got %d", r.Cursor)
 	}
 }
 
