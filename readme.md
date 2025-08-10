@@ -68,7 +68,7 @@ Interactive example (typical session):
 
     ./texteditor README.md
 
-- Move the cursor with the arrow keys, PageUp/PageDown, Home/End.
+ - Move the cursor with the arrow keys (or Ctrl+B/F/P/N), PageUp/PageDown, Home/End.
 - Search (incremental): press Ctrl+W, type a query — matches are highlighted in the viewport as you type; press Enter to jump to the current match, Esc to cancel.
 - Go to line: press Alt+G, enter a 1-based line number, press Enter to jump.
 - Save changes: press Ctrl+S.
