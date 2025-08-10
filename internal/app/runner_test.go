@@ -228,6 +228,33 @@ func TestRunner_VisualYank(t *testing.T) {
 	}
 }
 
+func TestRunner_VisualPaste(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), Cursor: 1, History: history.New()}
+	r.KillRing.Set("XY")
+	// Enter visual mode
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	// Extend selection to include "el"
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
+	// Paste over selection
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'p', 0))
+	if got := r.Buf.String(); got != "hXYlo" {
+		t.Fatalf("expected buffer 'hXYlo' after paste, got %q", got)
+	}
+	if r.Mode != ModeInsert {
+		t.Fatalf("expected mode to return to insert after paste")
+	}
+	if r.VisualStart != -1 {
+		t.Fatalf("expected visual start reset after paste")
+	}
+	if r.Cursor != 1+len("XY") {
+		t.Fatalf("expected cursor at %d after paste, got %d", 1+len("XY"), r.Cursor)
+	}
+	if r.KillRing.Get() != "XY" {
+		t.Fatalf("expected kill ring to remain unchanged after paste")
+	}
+}
+
 func TestRunner_UndoRedo(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
 	// type 'a', 'b'
