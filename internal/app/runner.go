@@ -292,7 +292,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	}
 
 	// Arrow keys and basic cursor movement (Ctrl+B/F for left/right, Ctrl+P/N for up/down)
-	if ev.Key() == tcell.KeyLeft || (ev.Key() == tcell.KeyRune && ev.Rune() == 'b' && ev.Modifiers() == tcell.ModCtrl) {
+	if ev.Key() == tcell.KeyLeft || ev.Key() == tcell.KeyCtrlB || (ev.Key() == tcell.KeyRune && ev.Rune() == 'b' && ev.Modifiers() == tcell.ModCtrl) {
 		if r.Cursor > 0 {
 			r.Cursor--
 		}
@@ -301,7 +301,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-	if ev.Key() == tcell.KeyRight || (ev.Key() == tcell.KeyRune && ev.Rune() == 'f' && ev.Modifiers() == tcell.ModCtrl) {
+	if ev.Key() == tcell.KeyRight || ev.Key() == tcell.KeyCtrlF || (ev.Key() == tcell.KeyRune && ev.Rune() == 'f' && ev.Modifiers() == tcell.ModCtrl) {
 		if r.Buf != nil && r.Cursor < r.Buf.Len() {
 			r.Cursor++
 		}
@@ -310,14 +310,14 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-	if ev.Key() == tcell.KeyUp || (ev.Key() == tcell.KeyRune && ev.Rune() == 'p' && ev.Modifiers() == tcell.ModCtrl) {
+	if ev.Key() == tcell.KeyUp || ev.Key() == tcell.KeyCtrlP || (ev.Key() == tcell.KeyRune && ev.Rune() == 'p' && ev.Modifiers() == tcell.ModCtrl) {
 		r.moveCursorVertical(-1)
 		if r.Screen != nil {
 			r.draw(nil)
 		}
 		return false
 	}
-	if ev.Key() == tcell.KeyDown || (ev.Key() == tcell.KeyRune && ev.Rune() == 'n' && ev.Modifiers() == tcell.ModCtrl) {
+	if ev.Key() == tcell.KeyDown || ev.Key() == tcell.KeyCtrlN || (ev.Key() == tcell.KeyRune && ev.Rune() == 'n' && ev.Modifiers() == tcell.ModCtrl) {
 		r.moveCursorVertical(1)
 		if r.Screen != nil {
 			r.draw(nil)

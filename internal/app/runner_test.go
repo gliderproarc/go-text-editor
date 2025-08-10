@@ -90,37 +90,62 @@ func TestRunner_BackspaceAndDelete(t *testing.T) {
 
 func TestRunner_CursorMoveHorizontal(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("ab"), Cursor: 1}
+	// Right arrow
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
 	if r.Cursor != 2 {
 		t.Fatalf("expected cursor 2 after right arrow, got %d", r.Cursor)
 	}
+	// Dedicated Ctrl+B key
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlB, 0, 0))
+	if r.Cursor != 1 {
+		t.Fatalf("expected cursor 1 after KeyCtrlB, got %d", r.Cursor)
+	}
+	// Dedicated Ctrl+F key
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlF, 0, 0))
+	if r.Cursor != 2 {
+		t.Fatalf("expected cursor 2 after KeyCtrlF, got %d", r.Cursor)
+	}
+	// Rune with Ctrl modifiers
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', tcell.ModCtrl))
 	if r.Cursor != 1 {
-		t.Fatalf("expected cursor 1 after Ctrl+B, got %d", r.Cursor)
+		t.Fatalf("expected cursor 1 after Ctrl+B rune, got %d", r.Cursor)
 	}
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'f', tcell.ModCtrl))
 	if r.Cursor != 2 {
-		t.Fatalf("expected cursor 2 after Ctrl+F, got %d", r.Cursor)
+		t.Fatalf("expected cursor 2 after Ctrl+F rune, got %d", r.Cursor)
 	}
 }
 
 func TestRunner_CursorMoveVertical(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("ab\ncde\nf"), Cursor: 1}
+	// Down arrow
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyDown, 0, 0))
 	if r.Cursor != 4 {
 		t.Fatalf("expected cursor 4 after down arrow, got %d", r.Cursor)
 	}
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'n', tcell.ModCtrl))
+	// Dedicated Ctrl+N key
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlN, 0, 0))
 	if r.Cursor != 8 {
-		t.Fatalf("expected cursor 8 after Ctrl+N, got %d", r.Cursor)
+		t.Fatalf("expected cursor 8 after KeyCtrlN, got %d", r.Cursor)
 	}
+	// Up arrow
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyUp, 0, 0))
 	if r.Cursor != 4 {
 		t.Fatalf("expected cursor 4 after up arrow, got %d", r.Cursor)
 	}
+	// Dedicated Ctrl+P key
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlP, 0, 0))
+	if r.Cursor != 1 {
+		t.Fatalf("expected cursor 1 after KeyCtrlP, got %d", r.Cursor)
+	}
+	// Rune with Ctrl modifiers
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'n', tcell.ModCtrl))
+	if r.Cursor != 4 {
+		t.Fatalf("expected cursor 4 after Ctrl+N rune, got %d", r.Cursor)
+	}
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'p', tcell.ModCtrl))
 	if r.Cursor != 1 {
-		t.Fatalf("expected cursor 1 after Ctrl+P, got %d", r.Cursor)
+		t.Fatalf("expected cursor 1 after Ctrl+P rune, got %d", r.Cursor)
 	}
 }
 
