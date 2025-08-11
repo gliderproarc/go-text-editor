@@ -107,10 +107,10 @@ M3 — Search (incremental) & Go-to
 Done when: Search works across file; tests cover search index and wrap-around.
 
 M4 — Clipboard-like actions (line kill/yank) & Undo/Redo v1
-	•	Ctrl+K: cut line to an internal kill ring (single slot is fine for v1).
-	•	Ctrl+U: paste line.
-	•	p: paste from the kill ring in normal mode.
-	•	Ctrl+Z/Ctrl+Y: undo/redo using a simple history stack.
+		•	Ctrl+K: cut to end of line to an internal kill ring (single slot is fine for v1).
+		•	Ctrl+U/Ctrl+Y: paste line.
+		•	p: paste from the kill ring in normal mode.
+		•	Ctrl+Z/Ctrl+Y: undo/redo using a simple history stack.
 Done when: Basic cut/paste and undo/redo function with tests on edit history.
 
 M5 — Config & Keymaps
@@ -261,14 +261,15 @@ Reference Plugin (for milestone M8)
 ⸻
 
 6) Keybindings (nano-like defaults)
-	•	Ctrl+Q: Quit (prompt if dirty)
-	•	Ctrl+S: Save
-	•	Ctrl+O: Open file (prompt)
-	•	Ctrl+W: Search (incremental)
-	•	Ctrl+K: Cut line (kill)
-	•	Ctrl+U: Paste (yank)
-	•	Ctrl+Z / Ctrl+Y: Undo / Redo
-	•	F2: Contextual Command Menu
+		•	Ctrl+Q: Quit (prompt if dirty)
+		•	Ctrl+S: Save
+		•	Ctrl+O: Open file (prompt)
+		•	Ctrl+W: Search (incremental)
+		•	Ctrl+K: Cut to end of line
+		•	Ctrl+U/Ctrl+Y: Paste (yank)
+		•	Ctrl+Z / Ctrl+Y: Undo / Redo
+		•	Ctrl+A/Ctrl+E: Line start/end (insert)
+		•	F2: Contextual Command Menu
 (Remappable in config at M5.)
 
 ⸻
@@ -400,8 +401,8 @@ edit.delete	Delete	Delete	not at EOF
 edit.newline	Newline	Enter	buffer.isEditable
 nav.left/right/up/down	Move	arrows	always
 search.incremental	Search	Ctrl+W	always
-edit.killLine	Cut Line	Ctrl+K	buffer.isEditable
-edit.yank	Paste	Ctrl+U	killring.hasData
+edit.killLine   Cut to End of Line  Ctrl+K  buffer.isEditable
+edit.yank       Paste   Ctrl+U/Ctrl+Y  killring.hasData
 history.undo	Undo	Ctrl+Z	history.canUndo
 history.redo	Redo	Ctrl+Y	history.canRedo
 menu.context	Command Menu	F2	always

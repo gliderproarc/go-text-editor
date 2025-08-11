@@ -281,9 +281,20 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-	// Ctrl+Y -> redo
+	// Ctrl+Y -> yank in insert mode, redo otherwise
 	if ev.Key() == tcell.KeyRune && ev.Rune() == 'y' && ev.Modifiers() == tcell.ModCtrl {
-		if r.History != nil {
+		if r.Mode == ModeInsert {
+			if r.KillRing.HasData() {
+				text := r.KillRing.Get()
+				r.insertText(text)
+				if r.Logger != nil {
+					r.Logger.Event("action", map[string]any{"name": "yank", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+				}
+				if r.Screen != nil {
+					r.draw(nil)
+				}
+			}
+		} else if r.History != nil {
 			_ = r.History.Redo(r.Buf, &r.Cursor)
 			r.Dirty = true
 			if r.Logger != nil {
@@ -325,6 +336,27 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 
 	if r.Mode == ModeVisual {
 		return r.handleVisualKey(ev)
+	}
+
+	// Ctrl+A/Ctrl+E in insert mode -> line start/end
+	if r.Mode == ModeInsert && ((ev.Key() == tcell.KeyRune && ev.Rune() == 'a' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlA) {
+		start, _ := r.currentLineBounds()
+		r.Cursor = start
+		if r.Screen != nil {
+			r.draw(nil)
+		}
+		return false
+	}
+	if r.Mode == ModeInsert && ((ev.Key() == tcell.KeyRune && ev.Rune() == 'e' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlE) {
+		_, end := r.currentLineBounds()
+		if end > 0 && string(r.Buf.Slice(end-1, end)) == "\n" {
+			end--
+		}
+		r.Cursor = end
+		if r.Screen != nil {
+			r.draw(nil)
+		}
+		return false
 	}
 
 	// Arrow keys and basic cursor movement (Ctrl+B/F for left/right, Ctrl+P/N for up/down, hjkl in normal mode)
@@ -417,20 +449,27 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		return false
 	}
 
-	// Ctrl+K -> kill (cut) current line to kill ring
-	if ev.Key() == tcell.KeyRune && ev.Rune() == 'k' && ev.Modifiers() == tcell.ModCtrl {
-		start, end := r.currentLineBounds()
-		if end > start {
-			text := string(r.Buf.Slice(start, end))
-			_ = r.deleteRange(start, end, text)
-			r.KillRing.Set(text)
-			if r.Logger != nil {
-				r.Logger.Event("action", map[string]any{"name": "kill.line", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+	// Ctrl+K -> kill (cut) from cursor to end of line in insert mode
+	if r.Mode == ModeInsert && ev.Key() == tcell.KeyRune && ev.Rune() == 'k' && ev.Modifiers() == tcell.ModCtrl {
+		start := r.Cursor
+		_, lineEnd := r.currentLineBounds()
+		end := lineEnd
+		if start < end {
+			if string(r.Buf.Slice(start, start+1)) == "\n" {
+				end = start + 1
+			} else if end > start && string(r.Buf.Slice(end-1, end)) == "\n" {
+				end = end - 1
 			}
-			// Move cursor to start (now at next line)
-			r.Cursor = start
-			if r.Screen != nil {
-				r.draw(nil)
+			if end > start {
+				text := string(r.Buf.Slice(start, end))
+				_ = r.deleteRange(start, end, text)
+				r.KillRing.Set(text)
+				if r.Logger != nil {
+					r.Logger.Event("action", map[string]any{"name": "kill.eol", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+				}
+				if r.Screen != nil {
+					r.draw(nil)
+				}
 			}
 		}
 		return false
@@ -484,9 +523,10 @@ func drawHelp(s tcell.Screen) {
 		"- Ctrl+S: Save (Save As if no file)",
 		"- Ctrl+W: Search",
 		"- Alt+G: Go to line",
-		"- Ctrl+K: Cut line",
-		"- Ctrl+U: Paste",
+		"- Ctrl+K: Cut to end of line",
+		"- Ctrl+U/Ctrl+Y: Paste",
 		"- Ctrl+Z / Ctrl+Y: Undo / Redo",
+		"- Ctrl+A/Ctrl+E: Line start/end (insert)",
 		"- Modes: Normal (default), Insert (i), Visual (v)",
 		"- Normal mode: p paste",
 		"- Visual mode: y copy, x cut",
