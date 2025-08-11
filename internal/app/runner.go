@@ -282,7 +282,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		return false
 	}
 	// Ctrl+Y -> yank in insert mode, redo otherwise
-	if ev.Key() == tcell.KeyRune && ev.Rune() == 'y' && ev.Modifiers() == tcell.ModCtrl {
+	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'y' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlY {
 		if r.Mode == ModeInsert {
 			if r.KillRing.HasData() {
 				text := r.KillRing.Get()
@@ -450,7 +450,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	}
 
 	// Ctrl+K -> kill (cut) from cursor to end of line in insert mode
-	if r.Mode == ModeInsert && ev.Key() == tcell.KeyRune && ev.Rune() == 'k' && ev.Modifiers() == tcell.ModCtrl {
+	if r.Mode == ModeInsert && ((ev.Key() == tcell.KeyRune && ev.Rune() == 'k' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlK) {
 		start := r.Cursor
 		_, lineEnd := r.currentLineBounds()
 		end := lineEnd
@@ -475,7 +475,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		return false
 	}
 	// Ctrl+U -> yank (paste) from kill ring
-	if ev.Key() == tcell.KeyRune && ev.Rune() == 'u' && ev.Modifiers() == tcell.ModCtrl {
+	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'u' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlU {
 		if r.KillRing.HasData() {
 			text := r.KillRing.Get()
 			r.insertText(text)

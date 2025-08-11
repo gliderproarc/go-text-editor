@@ -252,19 +252,39 @@ func TestDrawBuffer_DirtyIndicator(t *testing.T) {
 }
 
 func TestRunner_KillToEndOfLineAndYank(t *testing.T) {
-	r := &Runner{Buf: buffer.NewGapBufferFromString("one\ntwo\n"), Cursor: 1, History: history.New(), Mode: ModeInsert}
-	// Ctrl+K to cut from cursor to end of line
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'k', tcell.ModCtrl))
-	if got := r.Buf.String(); got != "o\ntwo\n" {
-		t.Fatalf("expected buffer 'o\\ntwo\\n' after kill, got %q", got)
+	tests := []struct {
+		name string
+		kill *tcell.EventKey
+		yank *tcell.EventKey
+	}{
+		{
+			name: "rune_ctrl",
+			kill: tcell.NewEventKey(tcell.KeyRune, 'k', tcell.ModCtrl),
+			yank: tcell.NewEventKey(tcell.KeyRune, 'y', tcell.ModCtrl),
+		},
+		{
+			name: "dedicated_ctrl",
+			kill: tcell.NewEventKey(tcell.KeyCtrlK, 0, 0),
+			yank: tcell.NewEventKey(tcell.KeyCtrlY, 0, 0),
+		},
 	}
-	if !r.KillRing.HasData() || r.KillRing.Get() != "ne" {
-		t.Fatalf("expected kill ring to contain 'ne', got %q", r.KillRing.Get())
-	}
-	// Yank back with Ctrl+Y
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', tcell.ModCtrl))
-	if got := r.Buf.String(); got != "one\ntwo\n" {
-		t.Fatalf("expected buffer restored to 'one\\ntwo\\n' after yank, got %q", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &Runner{Buf: buffer.NewGapBufferFromString("one\ntwo\n"), Cursor: 1, History: history.New(), Mode: ModeInsert}
+			// Cut from cursor to end of line
+			r.handleKeyEvent(tt.kill)
+			if got := r.Buf.String(); got != "o\ntwo\n" {
+				t.Fatalf("expected buffer 'o\\ntwo\\n' after kill, got %q", got)
+			}
+			if !r.KillRing.HasData() || r.KillRing.Get() != "ne" {
+				t.Fatalf("expected kill ring to contain 'ne', got %q", r.KillRing.Get())
+			}
+			// Yank back
+			r.handleKeyEvent(tt.yank)
+			if got := r.Buf.String(); got != "one\ntwo\n" {
+				t.Fatalf("expected buffer restored to 'one\\ntwo\\n' after yank, got %q", got)
+			}
+		})
 	}
 }
 
