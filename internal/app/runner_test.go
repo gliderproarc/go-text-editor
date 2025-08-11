@@ -251,20 +251,32 @@ func TestDrawBuffer_DirtyIndicator(t *testing.T) {
 	}
 }
 
-func TestRunner_KillAndYankLine(t *testing.T) {
-	r := &Runner{Buf: buffer.NewGapBufferFromString("one\ntwo\n"), Cursor: 1, History: history.New()}
-	// Ctrl+K to cut current line (line 0)
+func TestRunner_KillToEndOfLineAndYank(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("one\ntwo\n"), Cursor: 1, History: history.New(), Mode: ModeInsert}
+	// Ctrl+K to cut from cursor to end of line
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'k', tcell.ModCtrl))
-	if got := r.Buf.String(); got != "two\n" {
-		t.Fatalf("expected buffer 'two\\n' after kill, got %q", got)
+	if got := r.Buf.String(); got != "o\ntwo\n" {
+		t.Fatalf("expected buffer 'o\\ntwo\\n' after kill, got %q", got)
 	}
-	if !r.KillRing.HasData() || r.KillRing.Get() != "one\n" {
-		t.Fatalf("expected kill ring to contain 'one\\n', got %q", r.KillRing.Get())
+	if !r.KillRing.HasData() || r.KillRing.Get() != "ne" {
+		t.Fatalf("expected kill ring to contain 'ne', got %q", r.KillRing.Get())
 	}
-	// Yank back
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'u', tcell.ModCtrl))
+	// Yank back with Ctrl+Y
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', tcell.ModCtrl))
 	if got := r.Buf.String(); got != "one\ntwo\n" {
 		t.Fatalf("expected buffer restored to 'one\\ntwo\\n' after yank, got %q", got)
+	}
+}
+
+func TestRunner_CtrlACtrlE(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("hello\n"), Cursor: 2, Mode: ModeInsert}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', tcell.ModCtrl))
+	if r.Cursor != 0 {
+		t.Fatalf("expected cursor at start of line, got %d", r.Cursor)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'e', tcell.ModCtrl))
+	if r.Cursor != 5 {
+		t.Fatalf("expected cursor at end of line, got %d", r.Cursor)
 	}
 }
 
@@ -332,6 +344,8 @@ func TestRunner_UndoRedo(t *testing.T) {
 	if got := r.Buf.String(); got != "" {
 		t.Fatalf("expected '' after second undo, got %q", got)
 	}
+	// exit insert mode for redo
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
 	// redo -> 'a'
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', tcell.ModCtrl))
 	if got := r.Buf.String(); got != "a" {
