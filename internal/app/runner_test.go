@@ -173,6 +173,46 @@ func TestModeTransitions(t *testing.T) {
 	}
 }
 
+func TestOpenLineFromNormalMode(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), Mode: ModeNormal}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'o', 0))
+	if got := r.Buf.String(); got != "hello\n" {
+		t.Fatalf("expected buffer 'hello\\n' after open line, got %q", got)
+	}
+	if r.Mode != ModeInsert {
+		t.Fatalf("expected mode insert after 'o', got %v", r.Mode)
+	}
+	if r.Cursor != len("hello\n") {
+		t.Fatalf("expected cursor at end of new line, got %d", r.Cursor)
+	}
+}
+
+func TestLineNavigationNormalMode(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("abc\ndef"), Cursor: 1, Mode: ModeNormal}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, '$', 0))
+	if r.Cursor != 3 {
+		t.Fatalf("expected cursor at end of line, got %d", r.Cursor)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, '0', 0))
+	if r.Cursor != 0 {
+		t.Fatalf("expected cursor at start of line, got %d", r.Cursor)
+	}
+}
+
+func TestLineNavigationVisualMode(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("abc\ndef"), Cursor: 1, Mode: ModeNormal}
+	// enter visual mode
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, '$', 0))
+	if r.Cursor != 3 {
+		t.Fatalf("expected cursor at end of line in visual mode, got %d", r.Cursor)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, '0', 0))
+	if r.Cursor != 0 {
+		t.Fatalf("expected cursor at start of line in visual mode, got %d", r.Cursor)
+	}
+}
+
 func TestVisualCutX(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), KillRing: history.KillRing{}}
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))

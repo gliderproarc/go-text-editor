@@ -228,6 +228,38 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				}
 			}
 			return false
+		case 'o':
+			if r.Buf != nil {
+				_, end := r.currentLineBounds()
+				r.Cursor = end
+				r.insertText("\n")
+			}
+			r.Mode = ModeInsert
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		case '$':
+			if r.Buf != nil {
+				_, end := r.currentLineBounds()
+				if end > 0 && string(r.Buf.Slice(end-1, end)) == "\n" {
+					end--
+				}
+				r.Cursor = end
+			}
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		case '0':
+			if r.Buf != nil {
+				start, _ := r.currentLineBounds()
+				r.Cursor = start
+			}
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
 		}
 	}
 	if r.Mode == ModeVisual && ev.Key() == tcell.KeyRune && ev.Rune() == 'v' && ev.Modifiers() == 0 {
@@ -655,6 +687,23 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 		return false
 	case ev.Key() == tcell.KeyDown || (ev.Key() == tcell.KeyRune && ev.Rune() == 'j' && ev.Modifiers() == 0):
 		r.moveCursorVertical(1)
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyRune && ev.Rune() == '$' && ev.Modifiers() == 0:
+		if r.Buf != nil {
+			_, end := r.currentLineBounds()
+			if end > 0 && string(r.Buf.Slice(end-1, end)) == "\n" {
+				end--
+			}
+			r.Cursor = end
+		}
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyRune && ev.Rune() == '0' && ev.Modifiers() == 0:
+		if r.Buf != nil {
+			start, _ := r.currentLineBounds()
+			r.Cursor = start
+		}
 		r.draw(nil)
 		return false
 	case ev.Key() == tcell.KeyRune && ev.Rune() == 'o' && ev.Modifiers() == 0:
