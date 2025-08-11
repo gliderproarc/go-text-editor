@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"example.com/texteditor/pkg/buffer"
+	"example.com/texteditor/pkg/config"
 	"example.com/texteditor/pkg/history"
 	"example.com/texteditor/pkg/search"
 	"github.com/gdamore/tcell/v2"
@@ -25,6 +26,22 @@ func TestHandleKeyEvent_CtrlQ_Key(t *testing.T) {
 	ev := tcell.NewEventKey(tcell.KeyCtrlQ, 0, 0)
 	if !r.handleKeyEvent(ev) {
 		t.Fatalf("expected KeyCtrlQ event to signal quit")
+	}
+}
+
+func TestHandleKeyEvent_RemapQuit(t *testing.T) {
+	kb, err := config.ParseKeybinding("Ctrl+X")
+	if err != nil {
+		t.Fatalf("parse keybinding: %v", err)
+	}
+	r := &Runner{Keymap: config.DefaultKeymap()}
+	r.Keymap["quit"] = kb
+
+	if r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl)) {
+		t.Fatalf("Ctrl+Q should not quit after remap")
+	}
+	if !r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'x', tcell.ModCtrl)) {
+		t.Fatalf("Ctrl+X should quit after remap")
 	}
 }
 

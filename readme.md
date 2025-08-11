@@ -430,13 +430,9 @@ Completed (high level)
 - M3: Search and go-to: incremental highlights, Enter to jump; Alt+G go-to.
 - M4: Kill/yank and undo/redo v1: Ctrl+K, Ctrl+U/Ctrl+Y, Ctrl+Z/Ctrl+Y; single-slot kill ring.
 - Extras: Help screen (F1/Ctrl+H), dirty-quit confirmation, basic normal/insert/visual modes, logging hooks.
+- M5: Config and keymaps: load ~/.texteditor/config.yaml to remap quit/save/search.
 
 Next Milestones (proposal)
-- M5 — Config & Keymaps
-  - Tasks: add pkg/config loader (YAML), define keymap structure, remap handlers in internal/app/runner.go via a dispatch table.
-  - Files: pkg/config/*, pkg/input/keymap.go (or fold into app), internal/app/runner.go (use keymap), readme.md.
-  - Acceptance: user can remap at least save/quit/search; invalid configs fail with a clear status message; unit tests for key resolution.
-
 - M6 — Multiple Buffers & Simple Windowing
   - Tasks: introduce an Editor orchestrator holding buffers; add open-in-new-buffer, buffer switcher, and optional single split.
   - Files: pkg/editor/editor.go, internal/app/runner.go (route to focused buffer), internal/app/*_ui.go (update prompts), tests for focus/render state.
