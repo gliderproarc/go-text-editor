@@ -25,35 +25,20 @@ func (r *Runner) runSaveAsPrompt() {
 	input := r.FilePath // prefill with current path if any
 	errMsg := ""
 	for {
-		r.draw(nil)
-		width, height := s.Size()
-		// Clear status line
-		for i := 0; i < width; i++ {
-			s.SetContent(i, height-1, ' ', nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite))
-		}
-		prompt := "Save As: " + input
-		for i, ch := range prompt {
-			s.SetContent(i, height-1, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite))
-		}
+		lines := []string{"Save As: " + input}
 		if errMsg != "" {
-			start := width - len([]rune(errMsg))
-			if start < len([]rune(prompt))+1 {
-				start = len([]rune(prompt)) + 1
-			}
-			idx := 0
-			for _, ch := range errMsg {
-				if start+idx < width {
-					s.SetContent(start+idx, height-1, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorRed).Background(tcell.ColorWhite))
-				}
-				idx++
-			}
+			lines = append(lines, errMsg)
+		} else {
+			lines = append(lines, "Enter to save, Esc to cancel")
 		}
-		s.Show()
+		r.setMiniBuffer(lines)
+		r.draw(nil)
 
 		ev := s.PollEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			if ev.Key() == tcell.KeyEsc {
+				r.clearMiniBuffer()
 				r.draw(nil)
 				return
 			}
@@ -66,6 +51,7 @@ func (r *Runner) runSaveAsPrompt() {
 					errMsg = err.Error()
 					continue
 				}
+				r.clearMiniBuffer()
 				r.showDialog("Saved " + input)
 				return
 			}

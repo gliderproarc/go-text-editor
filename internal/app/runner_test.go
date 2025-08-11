@@ -41,14 +41,14 @@ func TestHandleKeyEvent_ShowHelp(t *testing.T) {
 }
 
 func TestHandleKeyEvent_ShowHelp_CtrlKey(t *testing.T) {
-    r := &Runner{}
-    ev := tcell.NewEventKey(tcell.KeyCtrlH, 0, 0)
-    if r.handleKeyEvent(ev) {
-        t.Fatalf("Ctrl+H should not signal quit")
-    }
-    if !r.ShowHelp {
-        t.Fatalf("expected ShowHelp to be set after Ctrl+H")
-    }
+	r := &Runner{}
+	ev := tcell.NewEventKey(tcell.KeyCtrlH, 0, 0)
+	if r.handleKeyEvent(ev) {
+		t.Fatalf("Ctrl+H should not signal quit")
+	}
+	if !r.ShowHelp {
+		t.Fatalf("expected ShowHelp to be set after Ctrl+H")
+	}
 }
 
 func TestRunner_InsertAndSave(t *testing.T) {
@@ -255,7 +255,7 @@ func TestDrawFile_Highlights(t *testing.T) {
 	ranges := search.SearchAll(text, "hello")
 
 	// draw with highlights
-	drawFile(s, "f.txt", lines, ranges, -1, false, ModeInsert)
+	drawFile(s, "f.txt", lines, ranges, -1, false, ModeInsert, nil)
 
 	// check first line "hello" at (0,0..4) is highlighted
 	for x := 0; x < 5; x++ {
@@ -290,7 +290,7 @@ func TestDrawBuffer_DirtyIndicator(t *testing.T) {
 	defer s.Fini()
 
 	buf := buffer.NewGapBufferFromString("hello")
-	drawBuffer(s, buf, "f.txt", nil, 0, true, ModeInsert)
+	drawBuffer(s, buf, "f.txt", nil, 0, true, ModeInsert, nil)
 
 	_, height := s.Size()
 	expected := "f.txt [+] — Press Ctrl+Q to exit"
@@ -298,6 +298,28 @@ func TestDrawBuffer_DirtyIndicator(t *testing.T) {
 		cr, _, _, _ := s.GetContent(i, height-1)
 		if cr != r {
 			t.Fatalf("expected status %q, got mismatch at %d: %q", expected, i, string(cr))
+		}
+	}
+}
+
+func TestDrawBuffer_MiniBuffer(t *testing.T) {
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("initializing simulation screen failed: %v", err)
+	}
+	defer s.Fini()
+
+	buf := buffer.NewGapBufferFromString("hello")
+	mini := []string{"mini", "buffer"}
+	drawBuffer(s, buf, "f.txt", nil, 0, false, ModeInsert, mini)
+
+	_, height := s.Size()
+	for i, line := range mini {
+		for x, r := range line {
+			cr, _, _, _ := s.GetContent(x, height-1-len(mini)+i)
+			if cr != r {
+				t.Fatalf("expected %q at mini-buffer line %d pos %d, got %q", string(r), i, x, string(cr))
+			}
 		}
 	}
 }
@@ -463,19 +485,19 @@ func TestRunner_UndoRedo(t *testing.T) {
 }
 
 func TestRunner_Undo_DedicatedCtrlZ(t *testing.T) {
-    r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
-    // type 'a', 'b'
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
-    if got := r.Buf.String(); got != "ab" {
-        t.Fatalf("expected 'ab', got %q", got)
-    }
-    // undo via dedicated Ctrl+Z key -> 'a'
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlZ, 0, 0))
-    if got := r.Buf.String(); got != "a" {
-        t.Fatalf("expected 'a' after undo via KeyCtrlZ, got %q", got)
-    }
+	r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
+	// type 'a', 'b'
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
+	if got := r.Buf.String(); got != "ab" {
+		t.Fatalf("expected 'ab', got %q", got)
+	}
+	// undo via dedicated Ctrl+Z key -> 'a'
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlZ, 0, 0))
+	if got := r.Buf.String(); got != "a" {
+		t.Fatalf("expected 'a' after undo via KeyCtrlZ, got %q", got)
+	}
 }
 
 // TestRun_TypingSaveQuit_Simulation reflects README behavior: type directly, save with Ctrl+S, quit with Ctrl+Q.
@@ -704,48 +726,48 @@ func TestRun_SearchPrompt_Simulation(t *testing.T) {
 // when the terminal emits the dedicated Ctrl+W key (as seen in real logs), and
 // that it moves the cursor on Enter.
 func TestRun_SearchPrompt_CtrlKey_Simulation(t *testing.T) {
-    s := tcell.NewSimulationScreen("UTF-8")
-    if err := s.Init(); err != nil {
-        t.Fatalf("init sim screen: %v", err)
-    }
-    defer s.Fini()
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("init sim screen: %v", err)
+	}
+	defer s.Fini()
 
-    buf := buffer.NewGapBufferFromString("hello world hello")
-    r := &Runner{Screen: s, Buf: buf, History: history.New()}
+	buf := buffer.NewGapBufferFromString("hello world hello")
+	r := &Runner{Screen: s, Buf: buf, History: history.New()}
 
-    done := make(chan error, 1)
-    go func() { done <- r.Run() }()
+	done := make(chan error, 1)
+	go func() { done <- r.Run() }()
 
-    // allow event loop to start
-    time.Sleep(10 * time.Millisecond)
+	// allow event loop to start
+	time.Sleep(10 * time.Millisecond)
 
-    // open search prompt via dedicated Ctrl+W key
-    s.PostEventWait(tcell.NewEventKey(tcell.KeyCtrlW, 0, 0))
-    // type query
-    for _, ch := range "world" {
-        s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, ch, 0))
-    }
-    // accept search
-    s.PostEventWait(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
-    // quit editor
-    s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
+	// open search prompt via dedicated Ctrl+W key
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyCtrlW, 0, 0))
+	// type query
+	for _, ch := range "world" {
+		s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, ch, 0))
+	}
+	// accept search
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
+	// quit editor
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
 
-    select {
-    case err := <-done:
-        if err != nil {
-            t.Fatalf("runner returned error: %v", err)
-        }
-    case <-time.After(2 * time.Second):
-        t.Fatalf("timeout waiting for runner to quit")
-    }
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runner returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for runner to quit")
+	}
 
-    expected := len([]rune("hello "))
-    if r.Cursor != expected {
-        t.Fatalf("expected cursor %d after search, got %d", expected, r.Cursor)
-    }
-    if got := r.Buf.String(); got != "hello world hello" {
-        t.Fatalf("buffer modified during search: %q", got)
-    }
+	expected := len([]rune("hello "))
+	if r.Cursor != expected {
+		t.Fatalf("expected cursor %d after search, got %d", expected, r.Cursor)
+	}
+	if got := r.Buf.String(); got != "hello world hello" {
+		t.Fatalf("buffer modified during search: %q", got)
+	}
 }
 
 // TestRun_GoToPrompt_Simulation verifies that the go-to prompt jumps to the specified line.
