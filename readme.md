@@ -419,114 +419,38 @@ How an Agent Should Start
 
 ⸻
 
-Next Todos (short-term: M3–M5)
+Status & Next Milestones (updated)
 
-The following is a concrete, actionable plan for the next milestones (M3–M5). Each item includes sub-tasks, files to modify/create, acceptance criteria, tests to add, and a rough estimate.
+This project has moved beyond the early scaffolding and through the first interactive features. Here’s a quick snapshot of what’s done and what’s next.
 
-```
-- [x] M3: Incremental Search & Go-to (est. 3–5 dev hours)
-  - Tasks:
-    - Implement pkg/search with a simple incremental search API (SearchNext, SearchAll, HighlightRanges).
-    - Add a Search UI in internal/app: Ctrl+W opens a small prompt at the status line, types filter, highlights matches, Enter jumps to current match, Esc cancels.
-    - Implement go-to line (Ctrl+_ or Alt+G) with a modal prompt and cursor jump.
-  - Files:
-    - pkg/search/search.go, pkg/search/search_test.go
-    - internal/app/search_ui.go (prompt integration)
-    - internal/app/runner.go (wire keybindings to UI)
-  - Acceptance criteria:
-    - Incremental search highlights matches as you type and can jump to a result.
-    - Go-to line moves the cursor to specified line.
-    - Unit tests for search logic and integration tests for prompt -> jump flow.
+Completed (high level)
+- M0: Scaffold and event loop: terminal init, clean shutdown, basic UI.
+- M1: Open/display and navigation: file load, cursor movement, status UI.
+- M2: Editing core: gap buffer, insert/delete/newline, save + Save As.
+- M3: Search and go-to: incremental highlights, Enter to jump; Alt+G go-to.
+- M4: Kill/yank and undo/redo v1: Ctrl+K, Ctrl+U/Ctrl+Y, Ctrl+Z/Ctrl+Y; single-slot kill ring.
+- Extras: Help screen (F1/Ctrl+H), dirty-quit confirmation, basic normal/insert/visual modes, logging hooks.
 
-- [ ] M4: Kill/Yank (clipboard-like) & Undo/Redo v1 (est. 4–8 dev hours)
-  - Tasks:
-    - Implement a simple kill-ring structure (one slot v1) in pkg/history or pkg/clipboard.
-    - Add undo/redo stack in pkg/history with basic command records for Insert/Delete operations.
-    - Bindings: Ctrl+K cuts the current line (store in kill-ring and delete), p pastes the kill ring at cursor, Ctrl+Z/Ctrl+Y undo/redo.
-    - Tests for history correctness and kill/paste round-trips.
-  - Files:
-    - pkg/history/history.go, pkg/history/history_test.go
-    - pkg/clipboard/killring.go (or under pkg/history)
-    - internal/app/runner.go (key handling to call history/clipboard funcs)
-  - Acceptance criteria:
-    - Basic kill and yank work for single-line operations.
-    - Undo reverts the last edit; redo reapplies it. Tests cover sequence of ops.
+Next Milestones (proposal)
+- M5 — Config & Keymaps
+  - Tasks: add pkg/config loader (YAML), define keymap structure, remap handlers in internal/app/runner.go via a dispatch table.
+  - Files: pkg/config/*, pkg/input/keymap.go (or fold into app), internal/app/runner.go (use keymap), readme.md.
+  - Acceptance: user can remap at least save/quit/search; invalid configs fail with a clear status message; unit tests for key resolution.
 
-- [ ] M5: Config Loader & Keymap Remapping (est. 3–6 dev hours)
-  - Tasks:
-    - Implement pkg/config to load YAML (viper or yaml.v3) and validate config.
-    - Implement a simple keymap resolver in pkg/input that maps string key descriptors ("Ctrl+S", "F2") to command IDs.
-    - Wire config load at startup (internal/app.New or main) and allow overriding default keymap.
-    - Add a small integration test that writes a temp config that remaps Ctrl+S to a noop and verifies save key no longer triggers write.
-  - Files:
-    - pkg/config/config.go, pkg/config/config_test.go
-    - pkg/input/keymap.go, pkg/input/keymap_test.go
-    - internal/app/runner.go (read config on Init and consult keymap)
-  - Acceptance criteria:
-    - Config is loadable and valid; keymap changes affect command bindings in runtime.
-    - Tests validate keymap resolution logic.
-```
+- M6 — Multiple Buffers & Simple Windowing
+  - Tasks: introduce an Editor orchestrator holding buffers; add open-in-new-buffer, buffer switcher, and optional single split.
+  - Files: pkg/editor/editor.go, internal/app/runner.go (route to focused buffer), internal/app/*_ui.go (update prompts), tests for focus/render state.
+  - Acceptance: open two files, switch focus without data loss; status shows active file; tests assert buffer switching correctness.
 
-Notes & priorities
-- Prioritize M3 first since search helps users navigate content and pairs well with the existing buffer rendering.
-- M4 depends on reliable edit/undo semantics — keep operations small and well-tested.
-- M5 can be done in parallel or after M3/M4; it primarily affects key resolution and UX.
+- M7 — Contextual Command Menu v1
+  - Tasks: pkg/menu with command registry and fuzzy filter; popup UI; wire core commands with names/when-predicates.
+  - Files: pkg/menu/*, internal/app/runner.go (F2 handler), pkg/commands (metadata), tests for filtering and execution.
+  - Acceptance: pressing F2 shows commands; filtering works; selecting executes the command; smoke tests cover menu flow.
 
-Suggested workflow for each item
-- Create a small branch per milestone (e.g., feature/m3-search).
-- Write unit tests first (pkg/search, pkg/history, pkg/config) then implement minimal passing code.
-- Add integration tests for internal/app where practical (use tcell event simulation where possible or test UI helpers in isolation).
-- Keep PRs small (< 300 LOC) and focused on the milestone.
-
-If you want, I can now open separate branches and start M3 work tomorrow, or write the first issue/PR description for M3.
-
-``` 
-
-⸻
-
-Next Milestone — Open/Save UX (M2.5)
-
-Purpose
-- Add in-editor file open and save-as flows, basic status messaging, and a clearer status bar so users can open existing files and write new ones without restarting the app.
-
-Scope
-- Ctrl+O Open Prompt: status-line modal to type a path; Enter loads file, Esc cancels.
-- Save vs Save As: Ctrl+S saves to current path; Ctrl+Shift+S (or Ctrl+S when no path) prompts for a filename and writes there.
-- Status bar: show filename or [No File], dirty indicator [+], and line:col.
-- Transient status messages: show success/errors on the bottom line.
-
-Tasks
-- UI prompts (internal/app):
-  - open_ui.go: runOpenPrompt() using tcell, mirroring search/go-to prompt patterns.
-  - save_ui.go: runSaveAsPrompt() with overwrite handling; Esc cancel.
-- Runner methods:
-  - SaveAs(path string) error: set FilePath and call Save(); return errors to callers.
-  - flashStatus(msg string): draw a one-line message on the status bar (non-blocking, cleared on next redraw).
-- Keybindings (wire in handleKeyEvent):
-  - Ctrl+O → runOpenPrompt().
-  - Ctrl+S → Save() if FilePath set else runSaveAsPrompt().
-  - Ctrl+Shift+S → runSaveAsPrompt().
-- Rendering:
-  - drawBuffer(): include filename, [+] when Dirty, and current line:col in the status bar.
-
-Files To Add/Modify
-- internal/app/open_ui.go, internal/app/save_ui.go
-- internal/app/runner.go (keybindings + SaveAs + flashStatus)
-- internal/app/runner_test.go (integration tests using tcell simulation)
-- readme.md (this section)
-
-Acceptance Criteria
-- From a fresh session with no args: type, Save As to a new file, reopen to confirm contents.
-- Ctrl+O opens an existing path and renders its contents without restarting.
-- Dirty flag updates on edits; saving clears it; status bar shows filename and [+] appropriately, plus line:col.
-- Error conditions (e.g., missing path, permission denied) show a transient message instead of crashing.
-
-Tests
-- Unit: Runner.LoadFile normalizes CRLF; Save/SaveAs success and error paths.
-- Integration: simulation screen posts key events to exercise Ctrl+O and Save-As flows end-to-end.
+Upcoming (after M7)
+- M8 — Plugin API v0: JSON-RPC stdio, minimal capabilities, reference plugin (wordcount/toggle-comment).
+- M9 — Quality & Performance: piece table option behind TextStorage, large-file tests and thresholds, profiling.
 
 Notes
-- Navigation/scrolling can follow; not required for this milestone.
-- Overwrite handling: prompt or allow overwrite with a status message; choose simplest acceptable path first, then refine.
-
-End of README.
+- The existing UI already includes open/save prompts, search/go-to, and quit confirmation; the plan above focuses on configurability and multi-buffer ergonomics next.
+- Consider consolidating duplicated helpers (drawUI/drawHelp) found in cmd/texteditor and internal/app/runner.go during M5 refactors.

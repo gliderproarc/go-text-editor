@@ -8,3 +8,6 @@
 
 # Logs
 *.log
+
+# Local test file
+/textText.txt
