@@ -424,7 +424,7 @@ Next Todos (short-term: M3–M5)
 The following is a concrete, actionable plan for the next milestones (M3–M5). Each item includes sub-tasks, files to modify/create, acceptance criteria, tests to add, and a rough estimate.
 
 ```
-- [ ] M3: Incremental Search & Go-to (est. 3–5 dev hours)
+- [x] M3: Incremental Search & Go-to (est. 3–5 dev hours)
   - Tasks:
     - Implement pkg/search with a simple incremental search API (SearchNext, SearchAll, HighlightRanges).
     - Add a Search UI in internal/app: Ctrl+W opens a small prompt at the status line, types filter, highlights matches, Enter jumps to current match, Esc cancels.

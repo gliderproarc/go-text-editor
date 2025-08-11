@@ -51,14 +51,14 @@ func (r *Runner) runGoToPrompt() {
 				if n > len(lines) {
 					n = len(lines)
 				}
-				// compute rune index at start of line n
-				pos := 0
+				// compute byte offset at start of line n
+				bytePos := 0
 				for i := 0; i < n-1 && i < len(lines); i++ {
 					// +1 for the newline byte
-					pos += len([]rune(lines[i])) + 1
+					bytePos += len(lines[i]) + 1
 				}
-				// convert byte offset pos to rune index
-				r.Cursor = byteOffsetToRuneIndex(text, pos)
+				// convert byte offset to rune index
+				r.Cursor = byteOffsetToRuneIndex(text, bytePos)
 				r.draw(nil)
 				return
 			}

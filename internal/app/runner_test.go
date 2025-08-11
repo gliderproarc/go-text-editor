@@ -625,3 +625,90 @@ func TestRun_OpenFilePrompt_Simulation(t *testing.T) {
 		t.Fatalf("expected buffer to equal file content, got %q", got)
 	}
 }
+
+// TestRun_SearchPrompt_Simulation verifies that the search prompt moves the cursor
+// to the first match of the query when Enter is pressed.
+func TestRun_SearchPrompt_Simulation(t *testing.T) {
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("init sim screen: %v", err)
+	}
+	defer s.Fini()
+
+	buf := buffer.NewGapBufferFromString("hello world hello")
+	r := &Runner{Screen: s, Buf: buf, History: history.New()}
+
+	done := make(chan error, 1)
+	go func() { done <- r.Run() }()
+
+	// allow event loop to start
+	time.Sleep(10 * time.Millisecond)
+
+	// open search prompt via Ctrl+W
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'w', tcell.ModCtrl))
+	// type query
+	for _, ch := range "world" {
+		s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, ch, 0))
+	}
+	// accept search
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
+	// quit editor
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runner returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for runner to quit")
+	}
+
+	expected := len([]rune("hello "))
+	if r.Cursor != expected {
+		t.Fatalf("expected cursor %d after search, got %d", expected, r.Cursor)
+	}
+	if got := r.Buf.String(); got != "hello world hello" {
+		t.Fatalf("buffer modified during search: %q", got)
+	}
+}
+
+// TestRun_GoToPrompt_Simulation verifies that the go-to prompt jumps to the specified line.
+func TestRun_GoToPrompt_Simulation(t *testing.T) {
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("init sim screen: %v", err)
+	}
+	defer s.Fini()
+
+	content := "one\ntwo\nthree\n"
+	r := &Runner{Screen: s, Buf: buffer.NewGapBufferFromString(content), History: history.New()}
+
+	done := make(chan error, 1)
+	go func() { done <- r.Run() }()
+
+	time.Sleep(10 * time.Millisecond)
+
+	// open go-to prompt via Alt+G
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'g', tcell.ModAlt))
+	// type line number
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, '3', 0))
+	// accept
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
+	// quit editor
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runner returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for runner to quit")
+	}
+
+	expected := len([]rune("one\ntwo\n"))
+	if r.Cursor != expected {
+		t.Fatalf("expected cursor %d after go-to, got %d", expected, r.Cursor)
+	}
+}
