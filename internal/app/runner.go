@@ -306,20 +306,20 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-	// Ctrl+Z -> undo
-	if ev.Key() == tcell.KeyRune && ev.Rune() == 'z' && ev.Modifiers() == tcell.ModCtrl {
-		if r.History != nil {
-			_ = r.History.Undo(r.Buf, &r.Cursor)
-			r.Dirty = true
-			if r.Logger != nil {
-				r.Logger.Event("action", map[string]any{"name": "undo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
-			}
-			if r.Screen != nil {
-				r.draw(nil)
-			}
-		}
-		return false
-	}
+    // Ctrl+Z -> undo (handle both rune+Ctrl and dedicated control key)
+    if (ev.Key() == tcell.KeyRune && ev.Rune() == 'z' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlZ {
+        if r.History != nil {
+            _ = r.History.Undo(r.Buf, &r.Cursor)
+            r.Dirty = true
+            if r.Logger != nil {
+                r.Logger.Event("action", map[string]any{"name": "undo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+            }
+            if r.Screen != nil {
+                r.draw(nil)
+            }
+        }
+        return false
+    }
 	// Ctrl+Y -> yank in insert mode, redo otherwise
 	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'y' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlY {
 		if r.Mode == ModeInsert {
@@ -345,14 +345,14 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-	// Ctrl+W -> incremental search prompt
-	if ev.Key() == tcell.KeyRune && ev.Rune() == 'w' && ev.Modifiers() == tcell.ModCtrl {
-		r.runSearchPrompt()
-		if r.Logger != nil {
-			r.Logger.Event("action", map[string]any{"name": "search.prompt"})
-		}
-		return false
-	}
+    // Ctrl+W -> incremental search prompt (handle both rune+Ctrl and dedicated control key)
+    if (ev.Key() == tcell.KeyRune && ev.Rune() == 'w' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlW {
+        r.runSearchPrompt()
+        if r.Logger != nil {
+            r.Logger.Event("action", map[string]any{"name": "search.prompt"})
+        }
+        return false
+    }
 	// Alt+G -> go-to line (Alt modifier)
 	if ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == tcell.ModAlt {
 		r.runGoToPrompt()
@@ -361,17 +361,17 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-	// Show help on F1 or Ctrl+H
-	if ev.Key() == tcell.KeyF1 || (ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == tcell.ModCtrl) {
-		r.ShowHelp = true
-		if r.Logger != nil {
-			r.Logger.Event("action", map[string]any{"name": "help.show"})
-		}
-		if r.Screen != nil {
-			drawHelp(r.Screen)
-		}
-		return false
-	}
+    // Show help on F1 or Ctrl+H (support dedicated control key)
+    if ev.Key() == tcell.KeyF1 || (ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlH {
+        r.ShowHelp = true
+        if r.Logger != nil {
+            r.Logger.Event("action", map[string]any{"name": "help.show"})
+        }
+        if r.Screen != nil {
+            drawHelp(r.Screen)
+        }
+        return false
+    }
 
 	if r.Mode == ModeVisual {
 		return r.handleVisualKey(ev)
