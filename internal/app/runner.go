@@ -15,7 +15,8 @@ import (
 type Mode int
 
 const (
-	ModeInsert Mode = iota
+	ModeNormal Mode = iota
+	ModeInsert
 	ModeVisual
 )
 
@@ -36,7 +37,7 @@ type Runner struct {
 
 // New creates an empty Runner.
 func New() *Runner {
-	return &Runner{Buf: buffer.NewGapBuffer(0), History: history.New(), Mode: ModeInsert, VisualStart: -1}
+	return &Runner{Buf: buffer.NewGapBuffer(0), History: history.New(), Mode: ModeNormal, VisualStart: -1}
 }
 
 // LoadFile loads a file into the runner's buffer.
@@ -181,15 +182,38 @@ func (r *Runner) Run() error {
 // handleKeyEvent processes a key event. It returns true if the event signals
 // the runner should quit.
 func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
-	// Toggle visual mode on Escape
+	// Mode transitions similar to Vim
 	if ev.Key() == tcell.KeyEsc {
-		if r.Mode == ModeVisual {
-			r.Mode = ModeInsert
+		switch r.Mode {
+		case ModeInsert:
+			r.Mode = ModeNormal
+			r.draw(nil)
+			return false
+		case ModeVisual:
+			r.Mode = ModeNormal
 			r.VisualStart = -1
-		} else {
+			r.draw(nil)
+			return false
+		default:
+			return false
+		}
+	}
+	if r.Mode == ModeNormal && ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
+		switch ev.Rune() {
+		case 'i':
+			r.Mode = ModeInsert
+			r.draw(nil)
+			return false
+		case 'v':
 			r.Mode = ModeVisual
 			r.VisualStart = r.Cursor
+			r.draw(nil)
+			return false
 		}
+	}
+	if r.Mode == ModeVisual && ev.Key() == tcell.KeyRune && ev.Rune() == 'v' && ev.Modifiers() == 0 {
+		r.Mode = ModeNormal
+		r.VisualStart = -1
 		r.draw(nil)
 		return false
 	}
@@ -291,8 +315,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		return r.handleVisualKey(ev)
 	}
 
-	// Arrow keys and basic cursor movement (Ctrl+B/F for left/right, Ctrl+P/N for up/down)
-	if ev.Key() == tcell.KeyLeft || ev.Key() == tcell.KeyCtrlB || (ev.Key() == tcell.KeyRune && ev.Rune() == 'b' && ev.Modifiers() == tcell.ModCtrl) {
+	// Arrow keys and basic cursor movement (Ctrl+B/F for left/right, Ctrl+P/N for up/down, hjkl in normal mode)
+	if ev.Key() == tcell.KeyLeft || ev.Key() == tcell.KeyCtrlB || (ev.Key() == tcell.KeyRune && ev.Rune() == 'b' && ev.Modifiers() == tcell.ModCtrl) || (r.Mode != ModeInsert && ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == 0) {
 		if r.Cursor > 0 {
 			r.Cursor--
 		}
@@ -301,7 +325,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-	if ev.Key() == tcell.KeyRight || ev.Key() == tcell.KeyCtrlF || (ev.Key() == tcell.KeyRune && ev.Rune() == 'f' && ev.Modifiers() == tcell.ModCtrl) {
+	if ev.Key() == tcell.KeyRight || ev.Key() == tcell.KeyCtrlF || (ev.Key() == tcell.KeyRune && ev.Rune() == 'f' && ev.Modifiers() == tcell.ModCtrl) || (r.Mode != ModeInsert && ev.Key() == tcell.KeyRune && ev.Rune() == 'l' && ev.Modifiers() == 0) {
 		if r.Buf != nil && r.Cursor < r.Buf.Len() {
 			r.Cursor++
 		}
@@ -310,14 +334,14 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-	if ev.Key() == tcell.KeyUp || ev.Key() == tcell.KeyCtrlP || (ev.Key() == tcell.KeyRune && ev.Rune() == 'p' && ev.Modifiers() == tcell.ModCtrl) {
+	if ev.Key() == tcell.KeyUp || ev.Key() == tcell.KeyCtrlP || (ev.Key() == tcell.KeyRune && ev.Rune() == 'p' && ev.Modifiers() == tcell.ModCtrl) || (r.Mode != ModeInsert && ev.Key() == tcell.KeyRune && ev.Rune() == 'k' && ev.Modifiers() == 0) {
 		r.moveCursorVertical(-1)
 		if r.Screen != nil {
 			r.draw(nil)
 		}
 		return false
 	}
-	if ev.Key() == tcell.KeyDown || ev.Key() == tcell.KeyCtrlN || (ev.Key() == tcell.KeyRune && ev.Rune() == 'n' && ev.Modifiers() == tcell.ModCtrl) {
+	if ev.Key() == tcell.KeyDown || ev.Key() == tcell.KeyCtrlN || (ev.Key() == tcell.KeyRune && ev.Rune() == 'n' && ev.Modifiers() == tcell.ModCtrl) || (r.Mode != ModeInsert && ev.Key() == tcell.KeyRune && ev.Rune() == 'j' && ev.Modifiers() == 0) {
 		r.moveCursorVertical(1)
 		if r.Screen != nil {
 			r.draw(nil)
@@ -325,8 +349,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		return false
 	}
 
-	// Insert typed rune (simple handling: any rune with no Ctrl/Alt)
-	if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
+	// Insert typed rune only in insert mode
+	if r.Mode == ModeInsert && ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
 		text := string(ev.Rune())
 		r.insertText(text)
 		if r.Logger != nil {
@@ -339,7 +363,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	}
 
 	// Backspace
-	if ev.Key() == tcell.KeyBackspace || ev.Key() == tcell.KeyBackspace2 {
+	if r.Mode == ModeInsert && (ev.Key() == tcell.KeyBackspace || ev.Key() == tcell.KeyBackspace2) {
 		if r.Cursor > 0 {
 			// capture deleted rune
 			del := string(r.Buf.Slice(r.Cursor-1, r.Cursor))
@@ -355,7 +379,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	}
 
 	// Delete (forward)
-	if ev.Key() == tcell.KeyDelete {
+	if r.Mode == ModeInsert && ev.Key() == tcell.KeyDelete {
 		if r.Cursor < r.Buf.Len() {
 			del := string(r.Buf.Slice(r.Cursor, r.Cursor+1))
 			_ = r.deleteRange(r.Cursor, r.Cursor+1, del)
@@ -370,7 +394,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	}
 
 	// Enter -> newline
-	if ev.Key() == tcell.KeyEnter {
+	if r.Mode == ModeInsert && ev.Key() == tcell.KeyEnter {
 		r.insertText("\n")
 		if r.Logger != nil {
 			r.Logger.Event("action", map[string]any{"name": "newline", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
@@ -451,6 +475,8 @@ func drawHelp(s tcell.Screen) {
 		"- Ctrl+K: Cut line",
 		"- Ctrl+U: Paste",
 		"- Ctrl+Z / Ctrl+Y: Undo / Redo",
+		"- Modes: Normal (default), Insert (i), Visual (v)",
+		"- Visual mode: y copy, p paste, x cut",
 		"- Arrow keys or Ctrl+B/F/P/N: Move cursor",
 		"- Enter: New line; Backspace/Delete: Remove",
 		"- Typing: Inserts characters",
@@ -587,7 +613,28 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 				r.Cursor = start
 			}
 		}
-		r.Mode = ModeInsert
+		r.Mode = ModeNormal
+		r.VisualStart = -1
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyRune && ev.Rune() == 'x' && ev.Modifiers() == 0:
+		if r.Buf != nil {
+			start := r.VisualStart
+			end := r.Cursor
+			if start > end {
+				start, end = end, start
+			}
+			if start < end {
+				text := string(r.Buf.Slice(start, end))
+				_ = r.deleteRange(start, end, text)
+				r.KillRing.Set(text)
+				if r.Logger != nil {
+					r.Logger.Event("action", map[string]any{"name": "cut.visual", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+				}
+				r.Cursor = start
+			}
+		}
+		r.Mode = ModeNormal
 		r.VisualStart = -1
 		r.draw(nil)
 		return false
@@ -612,7 +659,7 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 				r.Logger.Event("action", map[string]any{"name": "paste.visual", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
 		}
-		r.Mode = ModeInsert
+		r.Mode = ModeNormal
 		r.VisualStart = -1
 		r.draw(nil)
 		return false

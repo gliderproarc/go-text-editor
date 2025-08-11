@@ -49,6 +49,7 @@ func TestRunner_InsertAndSave(t *testing.T) {
 	tmp.Close()
 
 	r := &Runner{Buf: buffer.NewGapBuffer(0), FilePath: tmp.Name()}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
 	// type 'a' then 'b' (avoid 'h' because it triggers help)
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
@@ -71,7 +72,7 @@ func TestRunner_InsertAndSave(t *testing.T) {
 
 func TestRunner_BackspaceAndDelete(t *testing.T) {
 	// backspace
-	r := &Runner{Buf: buffer.NewGapBufferFromString("ab"), Cursor: 2}
+	r := &Runner{Buf: buffer.NewGapBufferFromString("ab"), Cursor: 2, Mode: ModeInsert}
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyBackspace, 0, 0))
 	if r.Buf.String() != "a" {
 		t.Fatalf("expected 'a' after backspace, got %q", r.Buf.String())
@@ -81,7 +82,7 @@ func TestRunner_BackspaceAndDelete(t *testing.T) {
 	}
 
 	// delete forward
-	r = &Runner{Buf: buffer.NewGapBufferFromString("ab"), Cursor: 0}
+	r = &Runner{Buf: buffer.NewGapBufferFromString("ab"), Cursor: 0, Mode: ModeInsert}
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyDelete, 0, 0))
 	if r.Buf.String() != "b" {
 		t.Fatalf("expected 'b' after delete, got %q", r.Buf.String())
@@ -146,6 +147,46 @@ func TestRunner_CursorMoveVertical(t *testing.T) {
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'p', tcell.ModCtrl))
 	if r.Cursor != 1 {
 		t.Fatalf("expected cursor 1 after Ctrl+P rune, got %d", r.Cursor)
+	}
+}
+
+func TestModeTransitions(t *testing.T) {
+	r := &Runner{}
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected initial mode normal")
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
+	if r.Mode != ModeInsert {
+		t.Fatalf("expected mode insert after 'i'")
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected mode normal after Esc")
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
+	if r.Mode != ModeVisual {
+		t.Fatalf("expected mode visual after 'v'")
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected mode normal after Esc from visual")
+	}
+}
+
+func TestVisualCutX(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), KillRing: history.KillRing{}}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'l', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'l', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'x', 0))
+	if got := r.Buf.String(); got != "llo" {
+		t.Fatalf("expected buffer 'llo', got %q", got)
+	}
+	if data := r.KillRing.Get(); data != "he" {
+		t.Fatalf("expected kill ring 'he', got %q", data)
+	}
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected mode normal after cut")
 	}
 }
 
@@ -230,7 +271,7 @@ func TestRunner_KillAndYankLine(t *testing.T) {
 func TestRunner_VisualYank(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), Cursor: 1, History: history.New()}
 	// Enter visual mode
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
 	// Extend selection to include "el"
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
@@ -239,8 +280,8 @@ func TestRunner_VisualYank(t *testing.T) {
 	if got := r.KillRing.Get(); got != "el" {
 		t.Fatalf("expected kill ring to contain 'el', got %q", got)
 	}
-	if r.Mode != ModeInsert {
-		t.Fatalf("expected mode to return to insert after yank")
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected mode to return to normal after yank")
 	}
 	if r.VisualStart != -1 {
 		t.Fatalf("expected visual start reset after yank")
@@ -257,7 +298,7 @@ func TestRunner_VisualPaste(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), Cursor: 1, History: history.New()}
 	r.KillRing.Set("XY")
 	// Enter visual mode
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
 	// Extend selection to include "el"
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
@@ -266,8 +307,8 @@ func TestRunner_VisualPaste(t *testing.T) {
 	if got := r.Buf.String(); got != "hXYlo" {
 		t.Fatalf("expected buffer 'hXYlo' after paste, got %q", got)
 	}
-	if r.Mode != ModeInsert {
-		t.Fatalf("expected mode to return to insert after paste")
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected mode to return to normal after paste")
 	}
 	if r.VisualStart != -1 {
 		t.Fatalf("expected visual start reset after paste")
@@ -282,6 +323,7 @@ func TestRunner_VisualPaste(t *testing.T) {
 
 func TestRunner_UndoRedo(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
 	// type 'a', 'b'
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
@@ -335,7 +377,8 @@ func TestRun_TypingSaveQuit_Simulation(t *testing.T) {
 	// Give the loop a moment to start
 	time.Sleep(10 * time.Millisecond)
 
-	// Type 'a', 'b' (avoid 'h' which opens help per README)
+	// Enter insert mode and type 'a', 'b' (avoid 'h' which opens help per README)
+	s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
 	s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
 	s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
 	// Save via Ctrl+S
@@ -400,6 +443,7 @@ func TestRunner_SaveAs_WritesAndClearsDirty(t *testing.T) {
 	defer os.Remove(path)
 
 	r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
 	// type 'a','b'
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
