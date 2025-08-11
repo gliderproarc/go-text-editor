@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"example.com/texteditor/pkg/buffer"
+	"example.com/texteditor/pkg/config"
 	"example.com/texteditor/pkg/history"
 	"example.com/texteditor/pkg/logs"
 	"example.com/texteditor/pkg/search"
@@ -34,6 +35,7 @@ type Runner struct {
 	KillRing    history.KillRing
 	Logger      *logs.Logger
 	MiniBuf     []string
+	Keymap      map[string]config.Keybinding
 }
 
 func (r *Runner) setMiniBuffer(lines []string) {
@@ -46,7 +48,7 @@ func (r *Runner) clearMiniBuffer() {
 
 // New creates an empty Runner.
 func New() *Runner {
-	return &Runner{Buf: buffer.NewGapBuffer(0), History: history.New(), Mode: ModeNormal, VisualStart: -1}
+	return &Runner{Buf: buffer.NewGapBuffer(0), History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap()}
 }
 
 // LoadFile loads a file into the runner's buffer.
@@ -277,24 +279,15 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		r.draw(nil)
 		return false
 	}
-	// Ctrl+Q via rune + Ctrl
-	if ev.Key() == tcell.KeyRune && ev.Rune() == 'q' && ev.Modifiers() == tcell.ModCtrl {
+	// Command keybindings
+	if r.matchCommand(ev, "quit") {
 		if r.Dirty {
 			return r.runQuitPrompt()
 		}
 		return true
 	}
-	// Some platforms expose a dedicated CtrlQ key
-	if ev.Key() == tcell.KeyCtrlQ {
-		if r.Dirty {
-			return r.runQuitPrompt()
-		}
-		return true
-	}
-	// Ctrl+S -> save (handle both rune+Ctrl and dedicated control key)
-	if (ev.Key() == tcell.KeyRune && ev.Rune() == 's' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlS {
+	if r.matchCommand(ev, "save") {
 		if r.FilePath == "" {
-			// No file path set; prompt for Save As
 			r.runSaveAsPrompt()
 		} else {
 			if err := r.Save(); err == nil {
@@ -303,6 +296,13 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		if r.Logger != nil {
 			r.Logger.Event("action", map[string]any{"name": "save", "file": r.FilePath})
+		}
+		return false
+	}
+	if r.matchCommand(ev, "search") {
+		r.runSearchPrompt()
+		if r.Logger != nil {
+			r.Logger.Event("action", map[string]any{"name": "search.prompt"})
 		}
 		return false
 	}
@@ -357,14 +357,6 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			if r.Screen != nil {
 				r.draw(nil)
 			}
-		}
-		return false
-	}
-	// Ctrl+W -> incremental search prompt (handle both rune+Ctrl and dedicated control key)
-	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'w' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlW {
-		r.runSearchPrompt()
-		if r.Logger != nil {
-			r.Logger.Event("action", map[string]any{"name": "search.prompt"})
 		}
 		return false
 	}
@@ -837,6 +829,17 @@ func (r *Runner) currentLineBounds() (start, end int) {
 		}
 	}
 	return r.Buf.LineAt(line)
+}
+
+func (r *Runner) matchCommand(ev *tcell.EventKey, name string) bool {
+	if r.Keymap == nil {
+		r.Keymap = config.DefaultKeymap()
+	}
+	kb, ok := r.Keymap[name]
+	if !ok {
+		return false
+	}
+	return kb.Matches(ev)
 }
 
 func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode, minibuf []string) {
