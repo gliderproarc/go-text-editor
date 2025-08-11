@@ -294,24 +294,16 @@ func TestRunner_VisualYank(t *testing.T) {
 	}
 }
 
-func TestRunner_VisualPaste(t *testing.T) {
+func TestRunner_NormalPaste(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), Cursor: 1, History: history.New()}
 	r.KillRing.Set("XY")
-	// Enter visual mode
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
-	// Extend selection to include "el"
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
-	// Paste over selection
+	// Paste at cursor in normal mode
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'p', 0))
-	if got := r.Buf.String(); got != "hXYlo" {
-		t.Fatalf("expected buffer 'hXYlo' after paste, got %q", got)
+	if got := r.Buf.String(); got != "hXYello" {
+		t.Fatalf("expected buffer 'hXYello' after paste, got %q", got)
 	}
 	if r.Mode != ModeNormal {
-		t.Fatalf("expected mode to return to normal after paste")
-	}
-	if r.VisualStart != -1 {
-		t.Fatalf("expected visual start reset after paste")
+		t.Fatalf("expected mode to remain normal after paste")
 	}
 	if r.Cursor != 1+len("XY") {
 		t.Fatalf("expected cursor at %d after paste, got %d", 1+len("XY"), r.Cursor)

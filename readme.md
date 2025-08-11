@@ -109,6 +109,7 @@ Done when: Search works across file; tests cover search index and wrap-around.
 M4 — Clipboard-like actions (line kill/yank) & Undo/Redo v1
 	•	Ctrl+K: cut line to an internal kill ring (single slot is fine for v1).
 	•	Ctrl+U: paste line.
+	•	p: paste from the kill ring in normal mode.
 	•	Ctrl+Z/Ctrl+Y: undo/redo using a simple history stack.
 Done when: Basic cut/paste and undo/redo function with tests on edit history.
 
@@ -440,7 +441,7 @@ The following is a concrete, actionable plan for the next milestones (M3–M5). 
   - Tasks:
     - Implement a simple kill-ring structure (one slot v1) in pkg/history or pkg/clipboard.
     - Add undo/redo stack in pkg/history with basic command records for Insert/Delete operations.
-    - Bindings: Ctrl+K cuts the current line (store in kill-ring and delete), Ctrl+U pastes the kill ring at cursor, Ctrl+Z/Ctrl+Y undo/redo.
+    - Bindings: Ctrl+K cuts the current line (store in kill-ring and delete), p pastes the kill ring at cursor, Ctrl+Z/Ctrl+Y undo/redo.
     - Tests for history correctness and kill/paste round-trips.
   - Files:
     - pkg/history/history.go, pkg/history/history_test.go

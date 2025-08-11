@@ -209,6 +209,18 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.VisualStart = r.Cursor
 			r.draw(nil)
 			return false
+		case 'p':
+			if r.KillRing.HasData() {
+				text := r.KillRing.Get()
+				r.insertText(text)
+				if r.Logger != nil {
+					r.Logger.Event("action", map[string]any{"name": "paste.normal", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+				}
+				if r.Screen != nil {
+					r.draw(nil)
+				}
+			}
+			return false
 		}
 	}
 	if r.Mode == ModeVisual && ev.Key() == tcell.KeyRune && ev.Rune() == 'v' && ev.Modifiers() == 0 {
@@ -476,7 +488,8 @@ func drawHelp(s tcell.Screen) {
 		"- Ctrl+U: Paste",
 		"- Ctrl+Z / Ctrl+Y: Undo / Redo",
 		"- Modes: Normal (default), Insert (i), Visual (v)",
-		"- Visual mode: y copy, p paste, x cut",
+		"- Normal mode: p paste",
+		"- Visual mode: y copy, x cut",
 		"- Arrow keys or Ctrl+B/F/P/N: Move cursor",
 		"- Enter: New line; Backspace/Delete: Remove",
 		"- Typing: Inserts characters",
@@ -638,31 +651,6 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 		r.VisualStart = -1
 		r.draw(nil)
 		return false
-	case ev.Key() == tcell.KeyRune && ev.Rune() == 'p' && ev.Modifiers() == 0:
-		if r.Buf != nil && r.KillRing.HasData() {
-			start := r.VisualStart
-			end := r.Cursor
-			if start > end {
-				start, end = end, start
-			}
-			if start < end {
-				// remove current selection
-				removed := string(r.Buf.Slice(start, end))
-				_ = r.deleteRange(start, end, removed)
-				r.Cursor = start
-			} else {
-				r.Cursor = start
-			}
-			text := r.KillRing.Get()
-			r.insertText(text)
-			if r.Logger != nil {
-				r.Logger.Event("action", map[string]any{"name": "paste.visual", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
-			}
-		}
-		r.Mode = ModeNormal
-		r.VisualStart = -1
-		r.draw(nil)
-		return false
 	}
 	// ignore other keys in visual mode
 	return false
@@ -755,8 +743,11 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 	lineStart := 0     // byte offset of start of current line
 	lineStartRune := 0 // rune offset of start of current line
 	cursorColor := tcell.ColorWhite
-	if mode == ModeInsert {
+	switch mode {
+	case ModeInsert:
 		cursorColor = tcell.ColorBlue
+	case ModeNormal:
+		cursorColor = tcell.ColorGreen
 	}
 	cursorStyle := tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(cursorColor).Attributes(tcell.AttrBlink)
 	for i := 0; i < maxLines && i < len(lines); i++ {
