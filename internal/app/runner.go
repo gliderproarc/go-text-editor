@@ -2,10 +2,10 @@ package app
 
 import (
 	"os"
-	"strings"
 
 	"example.com/texteditor/pkg/buffer"
 	"example.com/texteditor/pkg/config"
+	"example.com/texteditor/pkg/editor"
 	"example.com/texteditor/pkg/history"
 	"example.com/texteditor/pkg/logs"
 	"github.com/gdamore/tcell/v2"
@@ -27,6 +27,7 @@ type Runner struct {
 	Buf         *buffer.GapBuffer
 	Cursor      int // cursor position in runes
 	Dirty       bool
+	Ed          *editor.Editor
 	ShowHelp    bool
 	Mode        Mode
 	VisualStart int
@@ -47,7 +48,17 @@ func (r *Runner) clearMiniBuffer() {
 
 // New creates an empty Runner.
 func New() *Runner {
-	return &Runner{Buf: buffer.NewGapBuffer(0), History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap()}
+	ed := editor.New()
+	bs := editor.BufferState{Buf: buffer.NewGapBuffer(0)}
+	ed.AddBuffer(bs)
+	return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Ed: ed}
+}
+
+func (r *Runner) saveBufferState() {
+	if r.Ed == nil {
+		return
+	}
+	r.Ed.UpdateCurrent(editor.BufferState{FilePath: r.FilePath, Buf: r.Buf, Cursor: r.Cursor, Dirty: r.Dirty})
 }
 
 // LoadFile loads a file into the runner's buffer.
@@ -58,21 +69,24 @@ func (r *Runner) LoadFile(path string) error {
 	if r.Logger != nil {
 		r.Logger.Event("open.attempt", map[string]any{"file": path})
 	}
-	data, err := os.ReadFile(path)
+	if r.Ed == nil {
+		r.Ed = editor.New()
+		r.Ed.AddBuffer(editor.BufferState{FilePath: r.FilePath, Buf: r.Buf, Cursor: r.Cursor, Dirty: r.Dirty})
+	}
+	r.saveBufferState()
+	bs, err := r.Ed.LoadFile(path)
 	if err != nil {
 		if r.Logger != nil {
 			r.Logger.Event("open.error", map[string]any{"file": path, "error": err.Error()})
 		}
 		return err
 	}
-	r.FilePath = path
-	// Normalize CRLF to LF for internal buffer storage
-	normalized := strings.ReplaceAll(string(data), "\r\n", "\n")
-	r.Buf = buffer.NewGapBufferFromString(normalized)
-	r.Cursor = r.Buf.Len()
-	r.Dirty = false
+	r.FilePath = bs.FilePath
+	r.Buf = bs.Buf
+	r.Cursor = bs.Cursor
+	r.Dirty = bs.Dirty
 	if r.Logger != nil {
-		r.Logger.Event("open.success", map[string]any{"file": path, "bytes": len(data), "runes": r.Buf.Len()})
+		r.Logger.Event("open.success", map[string]any{"file": path, "runes": r.Buf.Len(), "bytes": len([]byte(r.Buf.String()))})
 	}
 	return nil
 }
@@ -87,6 +101,7 @@ func (r *Runner) Save() error {
 		return err
 	}
 	r.Dirty = false
+	r.saveBufferState()
 	return nil
 }
 

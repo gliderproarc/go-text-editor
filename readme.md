@@ -431,13 +431,9 @@ Completed (high level)
 - M4: Kill/yank and undo/redo v1: Ctrl+K, Ctrl+U/Ctrl+Y, Ctrl+Z/Ctrl+Y; single-slot kill ring.
 - Extras: Help screen (F1/Ctrl+H), dirty-quit confirmation, basic normal/insert/visual modes, logging hooks.
 - M5: Config and keymaps: load ~/.texteditor/config.yaml to remap quit/save/search.
+- M6: Multiple buffers with open-in-new-buffer and buffer switching.
 
 Next Milestones (proposal)
-- M6 — Multiple Buffers & Simple Windowing
-  - Tasks: introduce an Editor orchestrator holding buffers; add open-in-new-buffer, buffer switcher, and optional single split.
-  - Files: pkg/editor/editor.go, internal/app/runner.go (route to focused buffer), internal/app/*_ui.go (update prompts), tests for focus/render state.
-  - Acceptance: open two files, switch focus without data loss; status shows active file; tests assert buffer switching correctness.
-
 - M7 — Contextual Command Menu v1
   - Tasks: pkg/menu with command registry and fuzzy filter; popup UI; wire core commands with names/when-predicates.
   - Files: pkg/menu/*, internal/app/runner.go (F2 handler), pkg/commands (metadata), tests for filtering and execution.

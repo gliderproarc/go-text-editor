@@ -198,6 +198,52 @@ func TestModeTransitions(t *testing.T) {
 	}
 }
 
+func TestRunner_BufferSwitch(t *testing.T) {
+	f1, err := os.CreateTemp("", "buf1_*.txt")
+	if err != nil {
+		t.Fatalf("CreateTemp f1: %v", err)
+	}
+	f1.Close()
+	defer os.Remove(f1.Name())
+
+	f2, err := os.CreateTemp("", "buf2_*.txt")
+	if err != nil {
+		t.Fatalf("CreateTemp f2: %v", err)
+	}
+	if _, err := f2.WriteString("two"); err != nil {
+		t.Fatalf("write f2: %v", err)
+	}
+	f2.Close()
+	defer os.Remove(f2.Name())
+
+	r := New()
+	if err := r.LoadFile(f1.Name()); err != nil {
+		t.Fatalf("LoadFile f1: %v", err)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
+
+	if err := r.LoadFile(f2.Name()); err != nil {
+		t.Fatalf("LoadFile f2: %v", err)
+	}
+	if r.FilePath != f2.Name() {
+		t.Fatalf("expected current file %q, got %q", f2.Name(), r.FilePath)
+	}
+
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyPgUp, 0, tcell.ModCtrl))
+	if r.FilePath != f1.Name() {
+		t.Fatalf("expected switch back to %q, got %q", f1.Name(), r.FilePath)
+	}
+	if got := r.Buf.String(); got != "a" {
+		t.Fatalf("expected buffer content 'a', got %q", got)
+	}
+
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyPgDn, 0, tcell.ModCtrl))
+	if r.FilePath != f2.Name() {
+		t.Fatalf("expected switch forward to %q, got %q", f2.Name(), r.FilePath)
+	}
+}
+
 func TestOpenLineFromNormalMode(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), Mode: ModeNormal}
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'o', 0))

@@ -136,6 +136,33 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
+	// Ctrl+PgUp/PgDn -> switch buffers
+	if ev.Key() == tcell.KeyPgUp && ev.Modifiers() == tcell.ModCtrl {
+		r.saveBufferState()
+		bs := r.Ed.Prev()
+		r.FilePath, r.Buf, r.Cursor, r.Dirty = bs.FilePath, bs.Buf, bs.Cursor, bs.Dirty
+		if r.Screen != nil {
+			if r.Buf != nil && r.Buf.Len() > 0 {
+				r.draw(nil)
+			} else {
+				drawUI(r.Screen)
+			}
+		}
+		return false
+	}
+	if ev.Key() == tcell.KeyPgDn && ev.Modifiers() == tcell.ModCtrl {
+		r.saveBufferState()
+		bs := r.Ed.Next()
+		r.FilePath, r.Buf, r.Cursor, r.Dirty = bs.FilePath, bs.Buf, bs.Cursor, bs.Dirty
+		if r.Screen != nil {
+			if r.Buf != nil && r.Buf.Len() > 0 {
+				r.draw(nil)
+			} else {
+				drawUI(r.Screen)
+			}
+		}
+		return false
+	}
 	// Ctrl+Z -> undo (handle both rune+Ctrl and dedicated control key)
 	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'z' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlZ {
 		if r.History != nil {
