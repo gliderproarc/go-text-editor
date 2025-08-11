@@ -204,6 +204,13 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Mode = ModeInsert
 			r.draw(nil)
 			return false
+		case 'a':
+			if r.Buf != nil && r.Cursor < r.Buf.Len() {
+				r.Cursor++
+			}
+			r.Mode = ModeInsert
+			r.draw(nil)
+			return false
 		case 'v':
 			r.Mode = ModeVisual
 			r.VisualStart = r.Cursor
@@ -528,8 +535,8 @@ func drawHelp(s tcell.Screen) {
 		"- Ctrl+Z / Ctrl+Y: Undo / Redo",
 		"- Ctrl+A/Ctrl+E: Line start/end (insert)",
 		"- Modes: Normal (default), Insert (i), Visual (v)",
-		"- Normal mode: p paste",
-		"- Visual mode: y copy, x cut",
+		"- Normal mode: p paste, a append",
+		"- Visual mode: y copy, x cut, o open line",
 		"- Arrow keys or Ctrl+B/F/P/N: Move cursor",
 		"- Enter: New line; Backspace/Delete: Remove",
 		"- Typing: Inserts characters",
@@ -648,6 +655,16 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 		return false
 	case ev.Key() == tcell.KeyDown || (ev.Key() == tcell.KeyRune && ev.Rune() == 'j' && ev.Modifiers() == 0):
 		r.moveCursorVertical(1)
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyRune && ev.Rune() == 'o' && ev.Modifiers() == 0:
+		if r.Buf != nil {
+			_, end := r.currentLineBounds()
+			r.Cursor = end
+			r.insertText("\n")
+		}
+		r.Mode = ModeInsert
+		r.VisualStart = -1
 		r.draw(nil)
 		return false
 	case ev.Key() == tcell.KeyRune && ev.Rune() == 'y' && ev.Modifiers() == 0:

@@ -345,6 +345,39 @@ func TestRunner_NormalPaste(t *testing.T) {
 	}
 }
 
+func TestNormalModeAppend(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("ab"), Cursor: 0}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
+	if r.Mode != ModeInsert {
+		t.Fatalf("expected insert mode after 'a'")
+	}
+	if r.Cursor != 1 {
+		t.Fatalf("expected cursor at 1 after 'a', got %d", r.Cursor)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'X', 0))
+	if got := r.Buf.String(); got != "aXb" {
+		t.Fatalf("expected buffer 'aXb', got %q", got)
+	}
+}
+
+func TestVisualModeOpenLine(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), Cursor: 0}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'o', 0))
+	if r.Mode != ModeInsert {
+		t.Fatalf("expected insert mode after 'o'")
+	}
+	if r.VisualStart != -1 {
+		t.Fatalf("expected visual start reset after 'o'")
+	}
+	if got := r.Buf.String(); got != "hello\n" {
+		t.Fatalf("expected buffer 'hello\\n', got %q", got)
+	}
+	if r.Cursor != len("hello\n") {
+		t.Fatalf("expected cursor at %d after open line, got %d", len("hello\n"), r.Cursor)
+	}
+}
+
 func TestRunner_UndoRedo(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New()}
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
