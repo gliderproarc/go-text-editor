@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+
 	"example.com/texteditor/pkg/search"
 	"github.com/gdamore/tcell/v2"
 )
@@ -22,14 +24,17 @@ func (r *Runner) runSearchPrompt() {
 		if query != "" {
 			ranges = search.SearchAll(text, query)
 		}
-		// redraw buffer (with highlights) and draw prompt
-		r.draw(ranges)
-		_, height := s.Size()
-		prompt := "Search: " + query
-		for i, ch := range prompt {
-			s.SetContent(i, height-1, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite))
+		lines := []string{"Search: " + query}
+		if query != "" {
+			if len(ranges) > 0 {
+				lines = append(lines, fmt.Sprintf("%d matches", len(ranges)))
+			} else {
+				lines = append(lines, "No matches")
+			}
 		}
-		s.Show()
+		r.setMiniBuffer(lines)
+		// redraw buffer (with highlights) and mini-buffer
+		r.draw(ranges)
 
 		ev := s.PollEvent()
 		switch ev := ev.(type) {
@@ -37,6 +42,7 @@ func (r *Runner) runSearchPrompt() {
 			// Cancel
 			if ev.Key() == tcell.KeyEsc {
 				// redraw main view without highlights
+				r.clearMiniBuffer()
 				r.draw(nil)
 				return
 			}
@@ -44,6 +50,8 @@ func (r *Runner) runSearchPrompt() {
 			if ev.Key() == tcell.KeyEnter {
 				// perform search and jump to next match
 				if query == "" {
+					r.clearMiniBuffer()
+					r.draw(nil)
 					return
 				}
 				text := r.Buf.String()
@@ -58,6 +66,7 @@ func (r *Runner) runSearchPrompt() {
 					// move cursor to start of match (convert bytes->runes)
 					r.Cursor = byteOffsetToRuneIndex(text, ranges[idx].Start)
 					// after jumping we redraw and return
+					r.clearMiniBuffer()
 					r.draw(nil)
 					return
 				}

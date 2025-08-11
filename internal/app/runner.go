@@ -33,6 +33,15 @@ type Runner struct {
 	History     *history.History
 	KillRing    history.KillRing
 	Logger      *logs.Logger
+	MiniBuf     []string
+}
+
+func (r *Runner) setMiniBuffer(lines []string) {
+	r.MiniBuf = lines
+}
+
+func (r *Runner) clearMiniBuffer() {
+	r.MiniBuf = nil
 }
 
 // New creates an empty Runner.
@@ -270,10 +279,16 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	}
 	// Ctrl+Q via rune + Ctrl
 	if ev.Key() == tcell.KeyRune && ev.Rune() == 'q' && ev.Modifiers() == tcell.ModCtrl {
+		if r.Dirty {
+			return r.runQuitPrompt()
+		}
 		return true
 	}
 	// Some platforms expose a dedicated CtrlQ key
 	if ev.Key() == tcell.KeyCtrlQ {
+		if r.Dirty {
+			return r.runQuitPrompt()
+		}
 		return true
 	}
 	// Ctrl+S -> save (handle both rune+Ctrl and dedicated control key)
@@ -306,20 +321,20 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-    // Ctrl+Z -> undo (handle both rune+Ctrl and dedicated control key)
-    if (ev.Key() == tcell.KeyRune && ev.Rune() == 'z' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlZ {
-        if r.History != nil {
-            _ = r.History.Undo(r.Buf, &r.Cursor)
-            r.Dirty = true
-            if r.Logger != nil {
-                r.Logger.Event("action", map[string]any{"name": "undo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
-            }
-            if r.Screen != nil {
-                r.draw(nil)
-            }
-        }
-        return false
-    }
+	// Ctrl+Z -> undo (handle both rune+Ctrl and dedicated control key)
+	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'z' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlZ {
+		if r.History != nil {
+			_ = r.History.Undo(r.Buf, &r.Cursor)
+			r.Dirty = true
+			if r.Logger != nil {
+				r.Logger.Event("action", map[string]any{"name": "undo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+			}
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+		}
+		return false
+	}
 	// Ctrl+Y -> yank in insert mode, redo otherwise
 	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'y' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlY {
 		if r.Mode == ModeInsert {
@@ -345,14 +360,14 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-    // Ctrl+W -> incremental search prompt (handle both rune+Ctrl and dedicated control key)
-    if (ev.Key() == tcell.KeyRune && ev.Rune() == 'w' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlW {
-        r.runSearchPrompt()
-        if r.Logger != nil {
-            r.Logger.Event("action", map[string]any{"name": "search.prompt"})
-        }
-        return false
-    }
+	// Ctrl+W -> incremental search prompt (handle both rune+Ctrl and dedicated control key)
+	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'w' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlW {
+		r.runSearchPrompt()
+		if r.Logger != nil {
+			r.Logger.Event("action", map[string]any{"name": "search.prompt"})
+		}
+		return false
+	}
 	// Alt+G -> go-to line (Alt modifier)
 	if ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == tcell.ModAlt {
 		r.runGoToPrompt()
@@ -361,17 +376,17 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-    // Show help on F1 or Ctrl+H (support dedicated control key)
-    if ev.Key() == tcell.KeyF1 || (ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlH {
-        r.ShowHelp = true
-        if r.Logger != nil {
-            r.Logger.Event("action", map[string]any{"name": "help.show"})
-        }
-        if r.Screen != nil {
-            drawHelp(r.Screen)
-        }
-        return false
-    }
+	// Show help on F1 or Ctrl+H (support dedicated control key)
+	if ev.Key() == tcell.KeyF1 || (ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == tcell.ModCtrl) || (ev.Key() == tcell.KeyCtrlH && r.Mode != ModeInsert) {
+		r.ShowHelp = true
+		if r.Logger != nil {
+			r.Logger.Event("action", map[string]any{"name": "help.show"})
+		}
+		if r.Screen != nil {
+			drawHelp(r.Screen)
+		}
+		return false
+	}
 
 	if r.Mode == ModeVisual {
 		return r.handleVisualKey(ev)
@@ -583,31 +598,15 @@ func drawHelp(s tcell.Screen) {
 	s.Show()
 }
 
-// showDialog displays a message on the status bar and waits for a key press.
+// showDialog displays a message in the mini-buffer and waits for a key press.
 // After dismissal it redraws the current buffer or default UI.
 func (r *Runner) showDialog(message string) {
 	if r.Screen == nil {
 		return
 	}
+	r.setMiniBuffer([]string{message, "Press any key to continue"})
+	r.draw(nil)
 	s := r.Screen
-	width, height := s.Size()
-	// clear status line
-	for i := 0; i < width; i++ {
-		s.SetContent(i, height-1, ' ', nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite))
-	}
-	msg := message + " — Press any key to continue"
-	start := (width - len([]rune(msg))) / 2
-	if start < 0 {
-		start = 0
-	}
-	idx := 0
-	for _, ch := range msg {
-		if start+idx < width {
-			s.SetContent(start+idx, height-1, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite))
-		}
-		idx++
-	}
-	s.Show()
 	for {
 		if ev := s.PollEvent(); ev != nil {
 			if _, ok := ev.(*tcell.EventKey); ok {
@@ -615,6 +614,7 @@ func (r *Runner) showDialog(message string) {
 			}
 		}
 	}
+	r.clearMiniBuffer()
 	if r.Buf != nil && r.Buf.Len() > 0 {
 		r.draw(nil)
 	} else {
@@ -622,14 +622,14 @@ func (r *Runner) showDialog(message string) {
 	}
 }
 
-func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool, mode Mode) {
+func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool, mode Mode, minibuf []string) {
 	if buf == nil {
-		drawFile(s, fname, []string{}, highlights, cursor, dirty, mode)
+		drawFile(s, fname, []string{}, highlights, cursor, dirty, mode, minibuf)
 		return
 	}
 	content := buf.String()
 	lines := strings.Split(content, "\n")
-	drawFile(s, fname, lines, highlights, cursor, dirty, mode)
+	drawFile(s, fname, lines, highlights, cursor, dirty, mode, minibuf)
 }
 
 // draw renders the buffer with optional highlights and current visual selection.
@@ -640,7 +640,7 @@ func (r *Runner) draw(highlights []search.Range) {
 	if vh := r.visualHighlightRange(); len(vh) > 0 {
 		highlights = append(highlights, vh...)
 	}
-	drawBuffer(r.Screen, r.Buf, r.FilePath, highlights, r.Cursor, r.Dirty, r.Mode)
+	drawBuffer(r.Screen, r.Buf, r.FilePath, highlights, r.Cursor, r.Dirty, r.Mode, r.MiniBuf)
 }
 
 // visualHighlightRange returns the current visual selection as byte offsets.
@@ -839,10 +839,11 @@ func (r *Runner) currentLineBounds() (start, end int) {
 	return r.Buf.LineAt(line)
 }
 
-func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode) {
+func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode, minibuf []string) {
 	width, height := s.Size()
 	s.Clear()
-	maxLines := height - 1
+	mbHeight := len(minibuf)
+	maxLines := height - 1 - mbHeight
 	if maxLines < 0 {
 		maxLines = 0
 	}
@@ -929,6 +930,18 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 	}
 	for i, r := range status {
 		s.SetContent(i, height-1, r, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite))
+	}
+	// draw mini-buffer lines just above status bar
+	for i, line := range minibuf {
+		y := height - 1 - mbHeight + i
+		runes := []rune(line)
+		for x := 0; x < width; x++ {
+			ch := ' '
+			if x < len(runes) {
+				ch = runes[x]
+			}
+			s.SetContent(x, y, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite))
+		}
 	}
 	s.Show()
 }
