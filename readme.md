@@ -365,6 +365,7 @@ go test ./... -run . -v
 	•	M7: Contextual command menu UI + registry.
 	•	M8: Plugin manager (JSON-RPC stdio) + sample plugin.
 	•	M9: Piece table option; perf tests.
+	•	M10: Smooth scrolling & viewport engine.
 
 ⸻
 
@@ -442,6 +443,7 @@ Next Milestones (proposal)
 Upcoming (after M7)
 - M8 — Plugin API v0: JSON-RPC stdio, minimal capabilities, reference plugin (wordcount/toggle-comment).
 - M9 — Quality & Performance: piece table option behind TextStorage, large-file tests and thresholds, profiling.
+- M10 — Smooth Scrolling & Viewport Engine: adjust viewport offset when cursor moves and add tests for edge cases.
 
 Notes
 - The existing UI already includes open/save prompts, search/go-to, and quit confirmation; the plan above focuses on configurability and multi-buffer ergonomics next.
