@@ -21,7 +21,6 @@ func (r *Runner) runSaveAsPrompt() {
 	if r.Screen == nil {
 		return
 	}
-	s := r.Screen
 	input := r.FilePath // prefill with current path if any
 	errMsg := ""
 	for {
@@ -34,7 +33,7 @@ func (r *Runner) runSaveAsPrompt() {
 		r.setMiniBuffer(lines)
 		r.draw(nil)
 
-		ev := s.PollEvent()
+		ev := r.waitEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			if ev.Key() == tcell.KeyEsc {

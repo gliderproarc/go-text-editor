@@ -13,27 +13,20 @@ func (r *Runner) runGoToPrompt() {
 	if r.Screen == nil {
 		return
 	}
-	s := r.Screen
 	input := ""
 	for {
-		// redraw buffer and draw prompt
+		r.setMiniBuffer([]string{"Go to line: " + input})
 		r.draw(nil)
-		_, height := s.Size()
-		prompt := "Go to line: " + input
-		for i, ch := range prompt {
-			s.SetContent(i, height-1, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorWhite))
-		}
-		s.Show()
 
-		ev := s.PollEvent()
+		ev := r.waitEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			if ev.Key() == tcell.KeyEsc {
+				r.clearMiniBuffer()
 				r.draw(nil)
 				return
 			}
 			if ev.Key() == tcell.KeyEnter {
-				// parse input
 				n := 0
 				if input != "" {
 					v, err := strconv.Atoi(strings.TrimSpace(input))
@@ -42,23 +35,19 @@ func (r *Runner) runGoToPrompt() {
 					}
 				}
 				if n <= 0 {
-					// invalid number; keep prompt open
 					continue
 				}
-				// move cursor to start of line n (1-based)
 				text := r.Buf.String()
 				lines := strings.Split(text, "\n")
 				if n > len(lines) {
 					n = len(lines)
 				}
-				// compute byte offset at start of line n
 				bytePos := 0
 				for i := 0; i < n-1 && i < len(lines); i++ {
-					// +1 for the newline byte
 					bytePos += len(lines[i]) + 1
 				}
-				// convert byte offset to rune index
 				r.Cursor = byteOffsetToRuneIndex(text, bytePos)
+				r.clearMiniBuffer()
 				r.draw(nil)
 				return
 			}

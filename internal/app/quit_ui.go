@@ -8,11 +8,10 @@ func (r *Runner) runQuitPrompt() bool {
 	if r.Screen == nil {
 		return true
 	}
-	s := r.Screen
 	r.setMiniBuffer([]string{"Unsaved changes. Quit without saving? (y/n)"})
 	r.draw(nil)
 	for {
-		ev := s.PollEvent()
+		ev := r.waitEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			if ev.Key() == tcell.KeyEsc || (ev.Key() == tcell.KeyRune && (ev.Rune() == 'n' || ev.Rune() == 'N')) {
