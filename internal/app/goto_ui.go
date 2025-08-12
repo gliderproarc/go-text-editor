@@ -47,6 +47,8 @@ func (r *Runner) runGoToPrompt() {
 					bytePos += len(lines[i]) + 1
 				}
 				r.Cursor = byteOffsetToRuneIndex(text, bytePos)
+				// we jumped to start of line n -> set CursorLine = n-1
+				r.CursorLine = n - 1
 				r.clearMiniBuffer()
 				r.draw(nil)
 				return

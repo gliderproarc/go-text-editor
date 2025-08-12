@@ -62,6 +62,15 @@ func (r *Runner) runSearchPrompt() {
 				if idx >= 0 && idx < len(ranges) {
 					// move cursor to start of match (convert bytes->runes)
 					r.Cursor = byteOffsetToRuneIndex(text, ranges[idx].Start)
+					// update CursorLine from byte position (count newlines before start)
+					prefix := text[:ranges[idx].Start]
+					count := 0
+					for i := 0; i < len(prefix); i++ {
+						if prefix[i] == '\n' {
+							count++
+						}
+					}
+					r.CursorLine = count
 					// after jumping we redraw and return
 					r.clearMiniBuffer()
 					r.draw(nil)

@@ -135,17 +135,12 @@ func (g *GapBuffer) Slice(start, end int) []rune {
 	if start >= end {
 		return []rune{}
 	}
-	out := make([]rune, end-start)
-	// iterate through and copy
-	idx := 0
-	for i := 0; i < g.Len() && idx < (end-start); i++ {
-		r := g.runeAt(i)
-		if i >= start && i < end {
-			out[idx] = r
-			idx++
-		}
-	}
-	return out
+    out := make([]rune, end-start)
+    // copy only the requested range directly
+    for i := start; i < end; i++ {
+        out[i-start] = g.runeAt(i)
+    }
+    return out
 }
 
 // Len returns the logical length (excluding gap)

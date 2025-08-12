@@ -27,15 +27,21 @@ func (r *Runner) visualHighlightRange() []search.Range {
 
 // insertText inserts text at the current cursor, records history, and updates state.
 func (r *Runner) insertText(text string) {
-	if text == "" {
-		return
-	}
-	_ = r.Buf.Insert(r.Cursor, []rune(text))
-	if r.History != nil {
-		r.History.RecordInsert(r.Cursor, text)
-	}
-	r.Cursor += len([]rune(text))
-	r.Dirty = true
+    if text == "" {
+        return
+    }
+    _ = r.Buf.Insert(r.Cursor, []rune(text))
+    if r.History != nil {
+        r.History.RecordInsert(r.Cursor, text)
+    }
+    r.Cursor += len([]rune(text))
+    // Update line index based on inserted newlines
+    for _, ch := range text {
+        if ch == '\n' {
+            r.CursorLine++
+        }
+    }
+    r.Dirty = true
 }
 
 // deleteRange deletes [start,end) with provided text for history and updates cursor.
@@ -49,20 +55,35 @@ func (r *Runner) deleteRange(start, end int, text string) error {
 	if start >= end {
 		return nil
 	}
-	if err := r.Buf.Delete(start, end); err != nil {
-		return err
-	}
-	if r.History != nil {
-		r.History.RecordDelete(start, text)
-	}
-	// adjust cursor
-	if r.Cursor > end {
-		r.Cursor -= (end - start)
-	} else if r.Cursor > start {
-		r.Cursor = start
-	}
-	r.Dirty = true
-	return nil
+    // remember original cursor to decide line adjustments
+    origCursor := r.Cursor
+    if err := r.Buf.Delete(start, end); err != nil {
+        return err
+    }
+    if r.History != nil {
+        r.History.RecordDelete(start, text)
+    }
+    // adjust cursor
+    if r.Cursor > end {
+        r.Cursor -= (end - start)
+    } else if r.Cursor > start {
+        r.Cursor = start
+    }
+    // adjust current line by number of removed newlines that were before or at cursor position
+    if text != "" && start < origCursor { // only adjust if deletion was before the cursor
+        removed := 0
+        for _, ch := range text {
+            if ch == '\n' {
+                removed++
+            }
+        }
+        r.CursorLine -= removed
+        if r.CursorLine < 0 {
+            r.CursorLine = 0
+        }
+    }
+    r.Dirty = true
+    return nil
 }
 
 // moveCursorVertical moves the cursor up or down by delta lines, preserving the column when possible.
@@ -76,24 +97,24 @@ func (r *Runner) moveCursorVertical(delta int) {
 		start--
 	}
 	col := r.Cursor - start
-	pos := start
-	if delta > 0 {
-		for i := 0; i < delta && pos < r.Buf.Len(); i++ {
-			for pos < r.Buf.Len() && r.Buf.RuneAt(pos) != '\n' {
-				pos++
-			}
-			if pos < r.Buf.Len() {
-				pos++
-			}
-		}
-	} else {
-		for i := 0; i > delta && pos > 0; i-- {
-			pos--
-			for pos > 0 && r.Buf.RuneAt(pos-1) != '\n' {
-				pos--
-			}
-		}
-	}
+    pos := start
+    if delta > 0 {
+        for i := 0; i < delta && pos < r.Buf.Len(); i++ {
+            for pos < r.Buf.Len() && r.Buf.RuneAt(pos) != '\n' {
+                pos++
+            }
+            if pos < r.Buf.Len() {
+                pos++
+            }
+        }
+    } else {
+        for i := 0; i > delta && pos > 0; i-- {
+            pos--
+            for pos > 0 && r.Buf.RuneAt(pos-1) != '\n' {
+                pos--
+            }
+        }
+    }
 	end := pos
 	for end < r.Buf.Len() && r.Buf.RuneAt(end) != '\n' {
 		end++
@@ -102,10 +123,24 @@ func (r *Runner) moveCursorVertical(delta int) {
 	if col > lineLen {
 		col = lineLen
 	}
-	r.Cursor = pos + col
-	if r.Screen != nil {
-		r.ensureCursorVisible()
-	}
+    r.Cursor = pos + col
+    // Update line index conservatively using cached line count
+    if r.Buf != nil {
+        total := len(r.Buf.Lines())
+        if total < 1 {
+            total = 1
+        }
+        r.CursorLine += delta
+        if r.CursorLine < 0 {
+            r.CursorLine = 0
+        }
+        if r.CursorLine > total-1 {
+            r.CursorLine = total - 1
+        }
+    }
+    if r.Screen != nil {
+        r.ensureCursorVisible()
+    }
 }
 
 // currentLineBounds returns the rune start and end indices for the current cursor's line.

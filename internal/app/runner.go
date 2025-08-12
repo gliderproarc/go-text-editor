@@ -22,14 +22,15 @@ const (
 
 // Runner owns the terminal lifecycle and a minimal event loop.
 type Runner struct {
-	Screen      tcell.Screen
-	FilePath    string
-	Buf         *buffer.GapBuffer
-	Cursor      int // cursor position in runes
-	TopLine     int // first visible line index
-	Dirty       bool
-	Ed          *editor.Editor
-	ShowHelp    bool
+    Screen      tcell.Screen
+    FilePath    string
+    Buf         *buffer.GapBuffer
+    Cursor      int // cursor position in runes
+    CursorLine  int // 0-based current line index (maintained incrementally)
+    TopLine     int // first visible line index
+    Dirty       bool
+    Ed          *editor.Editor
+    ShowHelp    bool
 	Mode        Mode
 	VisualStart int
 	History     *history.History
@@ -64,43 +65,45 @@ func (r *Runner) waitEvent() tcell.Event {
 
 // New creates an empty Runner.
 func New() *Runner {
-	ed := editor.New()
-	bs := editor.BufferState{Buf: buffer.NewGapBuffer(0)}
-	ed.AddBuffer(bs)
-	return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Ed: ed}
+    ed := editor.New()
+    bs := editor.BufferState{Buf: buffer.NewGapBuffer(0)}
+    ed.AddBuffer(bs)
+    return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Ed: ed}
 }
 
 // cursorLine returns the current 0-based line index of the cursor.
 func (r *Runner) cursorLine() int {
-	if r.Buf == nil {
-		return 0
-	}
-	line := 0
-	for i := 0; i < r.Cursor && i < r.Buf.Len(); i++ {
-		if string(r.Buf.Slice(i, i+1)) == "\n" {
-			line++
-		}
-	}
-	return line
+    if r.Buf == nil {
+        return 0
+    }
+    // Fallback calculation (avoids expensive Slice by using RuneAt)
+    line := 0
+    for i := 0; i < r.Cursor && i < r.Buf.Len(); i++ {
+        if r.Buf.RuneAt(i) == '\n' {
+            line++
+        }
+    }
+    return line
 }
 
 // ensureCursorVisible adjusts TopLine so the cursor lies within the viewport.
 func (r *Runner) ensureCursorVisible() {
-	if r.Screen == nil {
-		return
-	}
-	_, height := r.Screen.Size()
+    if r.Screen == nil {
+        return
+    }
+    _, height := r.Screen.Size()
 	mbHeight := len(r.MiniBuf)
 	maxLines := height - 1 - mbHeight
 	if maxLines <= 0 {
 		maxLines = 1
 	}
-	line := r.cursorLine()
-	if line < r.TopLine {
-		r.TopLine = line
-	} else if line >= r.TopLine+maxLines {
-		r.TopLine = line - maxLines + 1
-	}
+    // Use maintained CursorLine to avoid rescanning the buffer each draw.
+    line := r.CursorLine
+    if line < r.TopLine {
+        r.TopLine = line
+    } else if line >= r.TopLine+maxLines {
+        r.TopLine = line - maxLines + 1
+    }
 	if r.TopLine < 0 {
 		r.TopLine = 0
 	}
@@ -133,14 +136,25 @@ func (r *Runner) LoadFile(path string) error {
 		}
 		return err
 	}
-	r.FilePath = bs.FilePath
-	r.Buf = bs.Buf
-	r.Cursor = bs.Cursor
-	r.Dirty = bs.Dirty
-	if r.Logger != nil {
-		r.Logger.Event("open.success", map[string]any{"file": path, "runes": r.Buf.Len(), "bytes": len([]byte(r.Buf.String()))})
-	}
-	return nil
+    r.FilePath = bs.FilePath
+    r.Buf = bs.Buf
+    r.Cursor = bs.Cursor
+    r.Dirty = bs.Dirty
+    // Initialize CursorLine from cached lines
+    if r.Buf != nil {
+        lines := r.Buf.Lines()
+        if len(lines) > 0 {
+            r.CursorLine = len(lines) - 1
+        } else {
+            r.CursorLine = 0
+        }
+    } else {
+        r.CursorLine = 0
+    }
+    if r.Logger != nil {
+        r.Logger.Event("open.success", map[string]any{"file": path, "runes": r.Buf.Len(), "bytes": len([]byte(r.Buf.String()))})
+    }
+    return nil
 }
 
 // Save writes the buffer contents to the current FilePath and clears Dirty.
@@ -184,6 +198,35 @@ func (r *Runner) Fini() {
 	if r.Logger != nil {
 		r.Logger.Close()
 	}
+}
+
+// recomputeCursorLine recalculates CursorLine from Cursor and buffer contents.
+// It uses the cached line slice for efficiency and should be called sparingly
+// when Cursor is set directly without incremental updates.
+func (r *Runner) recomputeCursorLine() {
+    if r.Buf == nil {
+        r.CursorLine = 0
+        return
+    }
+    lines := r.Buf.Lines()
+    idx := 0
+    runesSoFar := 0
+    for idx < len(lines) {
+        lineRunes := len([]rune(lines[idx]))
+        if r.Cursor <= runesSoFar+lineRunes { // cursor within this line
+            r.CursorLine = idx
+            return
+        }
+        // account for newline rune between lines
+        runesSoFar += lineRunes + 1
+        idx++
+    }
+    // if beyond last line, clamp to last
+    if len(lines) > 0 {
+        r.CursorLine = len(lines) - 1
+    } else {
+        r.CursorLine = 0
+    }
 }
 
 // Run starts the event loop. It will initialize the screen if needed and

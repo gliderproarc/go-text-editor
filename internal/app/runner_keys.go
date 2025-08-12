@@ -30,8 +30,11 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Mode = ModeInsert
 			r.draw(nil)
 			return false
-		case 'a':
+	case 'a':
 			if r.Buf != nil && r.Cursor < r.Buf.Len() {
+				if r.Buf.RuneAt(r.Cursor) == '\n' {
+					r.CursorLine++
+				}
 				r.Cursor++
 			}
 			r.Mode = ModeInsert
@@ -68,7 +71,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		case '$':
 			if r.Buf != nil {
 				_, end := r.currentLineBounds()
-				if end > 0 && string(r.Buf.Slice(end-1, end)) == "\n" {
+				if end > 0 && r.Buf.RuneAt(end-1) == '\n' {
 					end--
 				}
 				r.Cursor = end
@@ -137,6 +140,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		r.saveBufferState()
 		bs := r.Ed.Prev()
 		r.FilePath, r.Buf, r.Cursor, r.Dirty = bs.FilePath, bs.Buf, bs.Cursor, bs.Dirty
+		r.recomputeCursorLine()
 		if r.Screen != nil {
 			r.draw(nil)
 		}
@@ -146,6 +150,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		r.saveBufferState()
 		bs := r.Ed.Next()
 		r.FilePath, r.Buf, r.Cursor, r.Dirty = bs.FilePath, bs.Buf, bs.Cursor, bs.Dirty
+		r.recomputeCursorLine()
 		if r.Screen != nil {
 			r.draw(nil)
 		}
@@ -155,6 +160,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'z' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlZ {
 		if r.History != nil {
 			_ = r.History.Undo(r.Buf, &r.Cursor)
+			r.recomputeCursorLine()
 			r.Dirty = true
 			if r.Logger != nil {
 				r.Logger.Event("action", map[string]any{"name": "undo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
@@ -180,6 +186,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			}
 		} else if r.History != nil {
 			_ = r.History.Redo(r.Buf, &r.Cursor)
+			r.recomputeCursorLine()
 			r.Dirty = true
 			if r.Logger != nil {
 				r.Logger.Event("action", map[string]any{"name": "redo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
@@ -223,21 +230,27 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-	if r.Mode == ModeInsert && ((ev.Key() == tcell.KeyRune && ev.Rune() == 'e' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlE) {
-		_, end := r.currentLineBounds()
-		if end > 0 && string(r.Buf.Slice(end-1, end)) == "\n" {
-			end--
+		if r.Mode == ModeInsert && ((ev.Key() == tcell.KeyRune && ev.Rune() == 'e' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlE) {
+			_, end := r.currentLineBounds()
+			if end > 0 && r.Buf.RuneAt(end-1) == '\n' {
+				end--
+			}
+			r.Cursor = end
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
 		}
-		r.Cursor = end
-		if r.Screen != nil {
-			r.draw(nil)
-		}
-		return false
-	}
 
 	// Arrow keys and basic cursor movement (Ctrl+B/F for left/right, Ctrl+P/N for up/down, hjkl in normal mode)
 	if ev.Key() == tcell.KeyLeft || ev.Key() == tcell.KeyCtrlB || (ev.Key() == tcell.KeyRune && ev.Rune() == 'b' && ev.Modifiers() == tcell.ModCtrl) || (r.Mode != ModeInsert && ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == 0) {
 		if r.Cursor > 0 {
+			if r.Buf != nil && r.Buf.RuneAt(r.Cursor-1) == '\n' {
+				r.CursorLine--
+				if r.CursorLine < 0 {
+					r.CursorLine = 0
+				}
+			}
 			r.Cursor--
 		}
 		if r.Screen != nil {
@@ -247,6 +260,9 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	}
 	if ev.Key() == tcell.KeyRight || ev.Key() == tcell.KeyCtrlF || (ev.Key() == tcell.KeyRune && ev.Rune() == 'f' && ev.Modifiers() == tcell.ModCtrl) || (r.Mode != ModeInsert && ev.Key() == tcell.KeyRune && ev.Rune() == 'l' && ev.Modifiers() == 0) {
 		if r.Buf != nil && r.Cursor < r.Buf.Len() {
+			if r.Buf.RuneAt(r.Cursor) == '\n' {
+				r.CursorLine++
+			}
 			r.Cursor++
 		}
 		if r.Screen != nil {
@@ -330,12 +346,12 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		start := r.Cursor
 		_, lineEnd := r.currentLineBounds()
 		end := lineEnd
-		if start < end {
-			if string(r.Buf.Slice(start, start+1)) == "\n" {
-				end = start + 1
-			} else if end > start && string(r.Buf.Slice(end-1, end)) == "\n" {
-				end = end - 1
-			}
+			if start < end {
+				if r.Buf.RuneAt(start) == '\n' {
+					end = start + 1
+				} else if end > start && r.Buf.RuneAt(end-1) == '\n' {
+					end = end - 1
+				}
 			if end > start {
 				text := string(r.Buf.Slice(start, end))
 				_ = r.deleteRange(start, end, text)
@@ -373,12 +389,21 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 	switch {
 	case ev.Key() == tcell.KeyLeft || (ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == 0):
 		if r.Cursor > 0 {
+			if r.Buf != nil && r.Buf.RuneAt(r.Cursor-1) == '\n' {
+				r.CursorLine--
+				if r.CursorLine < 0 {
+					r.CursorLine = 0
+				}
+			}
 			r.Cursor--
 		}
 		r.draw(nil)
 		return false
 	case ev.Key() == tcell.KeyRight || (ev.Key() == tcell.KeyRune && ev.Rune() == 'l' && ev.Modifiers() == 0):
 		if r.Buf != nil && r.Cursor < r.Buf.Len() {
+			if r.Buf.RuneAt(r.Cursor) == '\n' {
+				r.CursorLine++
+			}
 			r.Cursor++
 		}
 		r.draw(nil)
@@ -394,7 +419,7 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 	case ev.Key() == tcell.KeyRune && ev.Rune() == '$' && ev.Modifiers() == 0:
 		if r.Buf != nil {
 			_, end := r.currentLineBounds()
-			if end > 0 && string(r.Buf.Slice(end-1, end)) == "\n" {
+			if end > 0 && r.Buf.RuneAt(end-1) == '\n' {
 				end--
 			}
 			r.Cursor = end
