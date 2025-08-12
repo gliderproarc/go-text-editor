@@ -2,6 +2,7 @@ package buffer
 
 import (
 	"fmt"
+	"strings"
 )
 
 // GapBuffer is a simple gap-buffer implementation for runes.
@@ -10,6 +11,10 @@ type GapBuffer struct {
 	buf      []rune
 	gapStart int
 	gapEnd   int
+
+	cacheString string
+	cacheLines  []string
+	cacheValid  bool
 }
 
 // NewGapBuffer creates an empty GapBuffer with an initial capacity.
@@ -99,6 +104,7 @@ func (g *GapBuffer) Insert(pos int, s []rune) error {
 		g.buf[g.gapStart+i] = r
 	}
 	g.gapStart += len(s)
+	g.cacheValid = false
 	return nil
 }
 
@@ -114,6 +120,7 @@ func (g *GapBuffer) Delete(start, end int) error {
 	if g.gapEnd > len(g.buf) {
 		g.gapEnd = len(g.buf)
 	}
+	g.cacheValid = false
 	return nil
 }
 
@@ -188,9 +195,24 @@ func (g *GapBuffer) LineAt(idx int) (start, end int) {
 
 // String returns the buffer as a string (for debugging)
 func (g *GapBuffer) String() string {
+	if g.cacheValid {
+		return g.cacheString
+	}
 	out := make([]rune, 0, g.Len())
 	for i := 0; i < g.Len(); i++ {
 		out = append(out, g.runeAt(i))
 	}
-	return string(out)
+	g.cacheString = string(out)
+	g.cacheLines = strings.Split(g.cacheString, "\n")
+	g.cacheValid = true
+	return g.cacheString
+}
+
+// Lines returns the buffer split into lines. The result is cached until the
+// buffer is modified.
+func (g *GapBuffer) Lines() []string {
+	if !g.cacheValid {
+		g.String()
+	}
+	return g.cacheLines
 }

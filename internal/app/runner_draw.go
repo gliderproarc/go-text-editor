@@ -1,8 +1,6 @@
 package app
 
 import (
-	"strings"
-
 	"example.com/texteditor/pkg/buffer"
 	"example.com/texteditor/pkg/search"
 	"github.com/gdamore/tcell/v2"
@@ -10,7 +8,7 @@ import (
 
 // renderState captures a snapshot of editor state for the renderer goroutine.
 type renderState struct {
-	content    string
+	lines      []string
 	filePath   string
 	cursor     int
 	dirty      bool
@@ -104,9 +102,7 @@ func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights 
 		drawFile(s, fname, []string{}, highlights, cursor, dirty, mode, topLine, minibuf)
 		return
 	}
-	content := buf.String()
-	lines := strings.Split(content, "\n")
-	drawFile(s, fname, lines, highlights, cursor, dirty, mode, topLine, minibuf)
+	drawFile(s, fname, buf.Lines(), highlights, cursor, dirty, mode, topLine, minibuf)
 }
 
 // renderSnapshot captures the current runner state into a renderState.
@@ -117,14 +113,14 @@ func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
 	}
 	mini := append([]string(nil), r.MiniBuf...)
 	hs := append([]search.Range(nil), highlights...)
-	content := ""
+	var lines []string
 	bufLen := 0
 	if r.Buf != nil {
-		content = r.Buf.String()
+		lines = r.Buf.Lines()
 		bufLen = r.Buf.Len()
 	}
 	return renderState{
-		content:    content,
+		lines:      lines,
 		filePath:   r.FilePath,
 		cursor:     r.Cursor,
 		dirty:      r.Dirty,
@@ -144,8 +140,7 @@ func renderToScreen(s tcell.Screen, st renderState) {
 		return
 	}
 	if st.bufLen > 0 {
-		lines := strings.Split(st.content, "\n")
-		drawFile(s, st.filePath, lines, st.highlights, st.cursor, st.dirty, st.mode, st.topLine, st.miniBuf)
+		drawFile(s, st.filePath, st.lines, st.highlights, st.cursor, st.dirty, st.mode, st.topLine, st.miniBuf)
 	} else {
 		drawUI(s)
 	}
