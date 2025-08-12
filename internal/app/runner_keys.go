@@ -128,11 +128,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Logger.Event("action", map[string]any{"name": "open.prompt"})
 		}
 		if r.Screen != nil {
-			if r.Buf != nil && r.Buf.Len() > 0 {
-				r.draw(nil)
-			} else {
-				drawUI(r.Screen)
-			}
+			r.draw(nil)
 		}
 		return false
 	}
@@ -142,11 +138,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		bs := r.Ed.Prev()
 		r.FilePath, r.Buf, r.Cursor, r.Dirty = bs.FilePath, bs.Buf, bs.Cursor, bs.Dirty
 		if r.Screen != nil {
-			if r.Buf != nil && r.Buf.Len() > 0 {
-				r.draw(nil)
-			} else {
-				drawUI(r.Screen)
-			}
+			r.draw(nil)
 		}
 		return false
 	}
@@ -155,11 +147,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		bs := r.Ed.Next()
 		r.FilePath, r.Buf, r.Cursor, r.Dirty = bs.FilePath, bs.Buf, bs.Cursor, bs.Dirty
 		if r.Screen != nil {
-			if r.Buf != nil && r.Buf.Len() > 0 {
-				r.draw(nil)
-			} else {
-				drawUI(r.Screen)
-			}
+			r.draw(nil)
 		}
 		return false
 	}
@@ -217,7 +205,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Logger.Event("action", map[string]any{"name": "help.show"})
 		}
 		if r.Screen != nil {
-			drawHelp(r.Screen)
+			r.draw(nil)
 		}
 		return false
 	}

@@ -37,6 +37,8 @@ type Runner struct {
 	Logger      *logs.Logger
 	MiniBuf     []string
 	Keymap      map[string]config.Keybinding
+	EventCh     chan tcell.Event
+	RenderCh    chan renderState
 }
 
 func (r *Runner) setMiniBuffer(lines []string) {
@@ -45,6 +47,19 @@ func (r *Runner) setMiniBuffer(lines []string) {
 
 func (r *Runner) clearMiniBuffer() {
 	r.MiniBuf = nil
+}
+
+// waitEvent returns the next terminal event either from the runner's event
+// channel (if present) or by polling the screen directly. It blocks until an
+// event is available or returns nil if no screen is attached.
+func (r *Runner) waitEvent() tcell.Event {
+	if r.EventCh != nil {
+		return <-r.EventCh
+	}
+	if r.Screen != nil {
+		return r.Screen.PollEvent()
+	}
+	return nil
 }
 
 // New creates an empty Runner.
@@ -189,16 +204,37 @@ func (r *Runner) Run() error {
 		r.Logger.Event("run.start", map[string]any{"file": r.FilePath})
 		defer r.Logger.Event("run.end", map[string]any{"file": r.FilePath})
 	}
+	// set up channels for asynchronous events and rendering
+	r.EventCh = make(chan tcell.Event, 10)
+	r.RenderCh = make(chan renderState, 1)
+
+	// poll events in a separate goroutine
+	go func() {
+		for {
+			ev := r.Screen.PollEvent()
+			if ev == nil {
+				close(r.EventCh)
+				return
+			}
+			r.EventCh <- ev
+		}
+	}()
+
+	// renderer goroutine consumes snapshots and draws them
+	go func() {
+		for st := range r.RenderCh {
+			renderToScreen(r.Screen, st)
+		}
+	}()
 
 	// initial draw
-	if r.Buf != nil && r.Buf.Len() > 0 {
-		r.draw(nil)
-	} else {
-		drawUI(r.Screen)
-	}
+	r.draw(nil)
 
 	for {
-		ev := r.Screen.PollEvent()
+		ev, ok := <-r.EventCh
+		if !ok {
+			return nil
+		}
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			if r.Logger != nil {
@@ -209,17 +245,11 @@ func (r *Runner) Run() error {
 					"modifiers": int(ev.Modifiers()),
 				})
 			}
-			// If help is currently shown, consume this key to dismiss it
 			if r.ShowHelp {
 				r.ShowHelp = false
-				if r.Buf != nil && r.Buf.Len() > 0 {
-					r.draw(nil)
-				} else {
-					drawUI(r.Screen)
-				}
+				r.draw(nil)
 				continue
 			}
-			// Otherwise, handle the key normally; if it requests quit, exit
 			if r.handleKeyEvent(ev) {
 				if r.Logger != nil {
 					r.Logger.Event("action", map[string]any{"name": "quit"})
@@ -228,15 +258,7 @@ func (r *Runner) Run() error {
 			}
 		case *tcell.EventResize:
 			r.Screen.Sync()
-			if r.ShowHelp {
-				drawHelp(r.Screen)
-			} else {
-				if r.Buf != nil && r.Buf.Len() > 0 {
-					r.draw(nil)
-				} else {
-					drawUI(r.Screen)
-				}
-			}
+			r.draw(nil)
 		}
 	}
 }

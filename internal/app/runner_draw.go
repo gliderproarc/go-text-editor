@@ -8,6 +8,20 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
+// renderState captures a snapshot of editor state for the renderer goroutine.
+type renderState struct {
+	content    string
+	filePath   string
+	cursor     int
+	dirty      bool
+	mode       Mode
+	topLine    int
+	miniBuf    []string
+	highlights []search.Range
+	showHelp   bool
+	bufLen     int
+}
+
 // Minimal UI helpers (kept here so runner does not depend on package main)
 func drawUI(s tcell.Screen) {
 	width, height := s.Size()
@@ -68,20 +82,21 @@ func (r *Runner) showDialog(message string) {
 	}
 	r.setMiniBuffer([]string{message, "Press any key to continue"})
 	r.draw(nil)
-	s := r.Screen
-	for {
-		if ev := s.PollEvent(); ev != nil {
-			if _, ok := ev.(*tcell.EventKey); ok {
-				break
+	// Wait for a single event before dismissing the dialog.
+	if r.EventCh != nil {
+		<-r.EventCh
+	} else {
+		s := r.Screen
+		for {
+			if ev := s.PollEvent(); ev != nil {
+				if _, ok := ev.(*tcell.EventKey); ok {
+					break
+				}
 			}
 		}
 	}
 	r.clearMiniBuffer()
-	if r.Buf != nil && r.Buf.Len() > 0 {
-		r.draw(nil)
-	} else {
-		drawUI(s)
-	}
+	r.draw(nil)
 }
 
 func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool, mode Mode, topLine int, minibuf []string) {
@@ -94,16 +109,61 @@ func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights 
 	drawFile(s, fname, lines, highlights, cursor, dirty, mode, topLine, minibuf)
 }
 
-// draw renders the buffer with optional highlights and current visual selection.
-func (r *Runner) draw(highlights []search.Range) {
-	if r.Screen == nil {
-		return
-	}
+// renderSnapshot captures the current runner state into a renderState.
+func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
 	r.ensureCursorVisible()
 	if vh := r.visualHighlightRange(); len(vh) > 0 {
 		highlights = append(highlights, vh...)
 	}
-	drawBuffer(r.Screen, r.Buf, r.FilePath, highlights, r.Cursor, r.Dirty, r.Mode, r.TopLine, r.MiniBuf)
+	mini := append([]string(nil), r.MiniBuf...)
+	hs := append([]search.Range(nil), highlights...)
+	content := ""
+	bufLen := 0
+	if r.Buf != nil {
+		content = r.Buf.String()
+		bufLen = r.Buf.Len()
+	}
+	return renderState{
+		content:    content,
+		filePath:   r.FilePath,
+		cursor:     r.Cursor,
+		dirty:      r.Dirty,
+		mode:       r.Mode,
+		topLine:    r.TopLine,
+		miniBuf:    mini,
+		highlights: hs,
+		showHelp:   r.ShowHelp,
+		bufLen:     bufLen,
+	}
+}
+
+// renderToScreen draws the provided snapshot to the tcell screen.
+func renderToScreen(s tcell.Screen, st renderState) {
+	if st.showHelp {
+		drawHelp(s)
+		return
+	}
+	if st.bufLen > 0 {
+		lines := strings.Split(st.content, "\n")
+		drawFile(s, st.filePath, lines, st.highlights, st.cursor, st.dirty, st.mode, st.topLine, st.miniBuf)
+	} else {
+		drawUI(s)
+	}
+}
+
+// draw renders the buffer with optional highlights and current visual selection.
+// If a render channel is configured, the snapshot is sent to the renderer
+// goroutine; otherwise it is drawn synchronously.
+func (r *Runner) draw(highlights []search.Range) {
+	if r.Screen == nil {
+		return
+	}
+	snapshot := r.renderSnapshot(highlights)
+	if r.RenderCh != nil {
+		r.RenderCh <- snapshot
+		return
+	}
+	renderToScreen(r.Screen, snapshot)
 }
 
 func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode, topLine int, minibuf []string) {

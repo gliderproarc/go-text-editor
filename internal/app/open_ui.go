@@ -10,7 +10,6 @@ func (r *Runner) runOpenPrompt() {
 	if r.Screen == nil {
 		return
 	}
-	s := r.Screen
 	input := ""
 	errMsg := ""
 	for {
@@ -23,7 +22,7 @@ func (r *Runner) runOpenPrompt() {
 		r.setMiniBuffer(lines)
 		r.draw(nil)
 
-		ev := s.PollEvent()
+		ev := r.waitEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			// Cancel

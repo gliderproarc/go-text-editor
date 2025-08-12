@@ -15,10 +15,8 @@ func (r *Runner) runSearchPrompt() {
 	if r.Screen == nil {
 		return
 	}
-	s := r.Screen
 	query := ""
 	for {
-		// compute highlight ranges for current query
 		text := r.Buf.String()
 		var ranges []search.Range
 		if query != "" {
@@ -33,10 +31,9 @@ func (r *Runner) runSearchPrompt() {
 			}
 		}
 		r.setMiniBuffer(lines)
-		// redraw buffer (with highlights) and mini-buffer
 		r.draw(ranges)
 
-		ev := s.PollEvent()
+		ev := r.waitEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			// Cancel
