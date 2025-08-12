@@ -232,6 +232,42 @@ func TestRun_SearchPrompt_Simulation(t *testing.T) {
 	}
 }
 
+// TestRun_CommandMenuQuit_Simulation verifies that the command menu can execute
+// the quit command when selected via typing and Enter.
+func TestRun_CommandMenuQuit_Simulation(t *testing.T) {
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("init sim screen: %v", err)
+	}
+	defer s.Fini()
+
+	r := &Runner{Screen: s, Buf: buffer.NewGapBuffer(0), History: history.New()}
+
+	done := make(chan error, 1)
+	go func() { done <- r.Run() }()
+
+	// allow event loop to start
+	time.Sleep(10 * time.Millisecond)
+
+	// open command menu
+	s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 't', tcell.ModCtrl))
+	// type 'quit'
+	for _, ch := range "quit" {
+		s.PostEvent(tcell.NewEventKey(tcell.KeyRune, ch, 0))
+	}
+	// execute highlighted command
+	s.PostEvent(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runner returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for runner to quit")
+	}
+}
+
 // TestRun_SearchPrompt_CtrlKey_Simulation verifies the search prompt also opens
 // when the terminal emits the dedicated Ctrl+W key (as seen in real logs), and
 // that it moves the cursor on Enter.
