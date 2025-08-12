@@ -23,7 +23,7 @@ func TestDrawFile_Highlights(t *testing.T) {
 	ranges := search.SearchAll(text, "hello")
 
 	// draw with highlights
-	drawFile(s, "f.txt", lines, ranges, -1, false, ModeInsert, nil)
+	drawFile(s, "f.txt", lines, ranges, -1, false, ModeInsert, 0, nil)
 
 	// check first line "hello" at (0,0..4) is highlighted
 	for x := 0; x < 5; x++ {
@@ -58,7 +58,7 @@ func TestDrawBuffer_DirtyIndicator(t *testing.T) {
 	defer s.Fini()
 
 	buf := buffer.NewGapBufferFromString("hello")
-	drawBuffer(s, buf, "f.txt", nil, 0, true, ModeInsert, nil)
+	drawBuffer(s, buf, "f.txt", nil, 0, true, ModeInsert, 0, nil)
 
 	_, height := s.Size()
 	expected := "f.txt [+] — Press Ctrl+Q to exit"
@@ -79,7 +79,7 @@ func TestDrawBuffer_MiniBuffer(t *testing.T) {
 
 	buf := buffer.NewGapBufferFromString("hello")
 	mini := []string{"mini", "buffer"}
-	drawBuffer(s, buf, "f.txt", nil, 0, false, ModeInsert, mini)
+	drawBuffer(s, buf, "f.txt", nil, 0, false, ModeInsert, 0, mini)
 
 	_, height := s.Size()
 	for i, line := range mini {
@@ -89,5 +89,33 @@ func TestDrawBuffer_MiniBuffer(t *testing.T) {
 				t.Fatalf("expected %q at mini-buffer line %d pos %d, got %q", string(r), i, x, string(cr))
 			}
 		}
+	}
+}
+
+// TestDrawFile_Viewport ensures that topLine offsets the rendered lines.
+func TestDrawFile_Viewport(t *testing.T) {
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("initializing simulation screen failed: %v", err)
+	}
+	defer s.Fini()
+
+	lines := []string{"l1", "l2", "l3"}
+	drawFile(s, "f.txt", lines, nil, -1, false, ModeInsert, 1, nil)
+	cr, _, _, _ := s.GetContent(0, 0)
+	if cr != 'l' {
+		t.Fatalf("expected 'l' at (0,0) got %q", string(cr))
+	}
+	cr, _, _, _ = s.GetContent(1, 0)
+	if cr != '2' {
+		t.Fatalf("expected '2' at (1,0) got %q", string(cr))
+	}
+	cr, _, _, _ = s.GetContent(0, 1)
+	if cr != 'l' {
+		t.Fatalf("expected 'l' at (0,1) got %q", string(cr))
+	}
+	cr, _, _, _ = s.GetContent(1, 1)
+	if cr != '3' {
+		t.Fatalf("expected '3' at (1,1) got %q", string(cr))
 	}
 }

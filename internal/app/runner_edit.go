@@ -88,6 +88,9 @@ func (r *Runner) moveCursorVertical(delta int) {
 		col = lineLen
 	}
 	r.Cursor = start + col
+	if r.Screen != nil {
+		r.ensureCursorVisible()
+	}
 }
 
 // currentLineBounds returns the rune start and end indices for the current cursor's line.
