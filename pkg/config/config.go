@@ -32,6 +32,7 @@ func DefaultKeymap() map[string]Keybinding {
 		"quit":   mustParse("Ctrl+Q"),
 		"save":   mustParse("Ctrl+S"),
 		"search": mustParse("Ctrl+W"),
+		"menu":   mustParse("Ctrl+T"),
 	}
 }
 

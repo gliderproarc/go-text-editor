@@ -30,7 +30,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Mode = ModeInsert
 			r.draw(nil)
 			return false
-	case 'a':
+		case 'a':
 			if r.Buf != nil && r.Cursor < r.Buf.Len() {
 				if r.Buf.RuneAt(r.Cursor) == '\n' {
 					r.CursorLine++
@@ -123,6 +123,9 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Logger.Event("action", map[string]any{"name": "search.prompt"})
 		}
 		return false
+	}
+	if r.matchCommand(ev, "menu") {
+		return r.runCommandMenu()
 	}
 	// Ctrl+O -> open file prompt (handle both rune+Ctrl and dedicated control key)
 	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'o' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlO {
@@ -230,17 +233,17 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-		if r.Mode == ModeInsert && ((ev.Key() == tcell.KeyRune && ev.Rune() == 'e' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlE) {
-			_, end := r.currentLineBounds()
-			if end > 0 && r.Buf.RuneAt(end-1) == '\n' {
-				end--
-			}
-			r.Cursor = end
-			if r.Screen != nil {
-				r.draw(nil)
-			}
-			return false
+	if r.Mode == ModeInsert && ((ev.Key() == tcell.KeyRune && ev.Rune() == 'e' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlE) {
+		_, end := r.currentLineBounds()
+		if end > 0 && r.Buf.RuneAt(end-1) == '\n' {
+			end--
 		}
+		r.Cursor = end
+		if r.Screen != nil {
+			r.draw(nil)
+		}
+		return false
+	}
 
 	// Arrow keys and basic cursor movement (Ctrl+B/F for left/right, Ctrl+P/N for up/down, hjkl in normal mode)
 	if ev.Key() == tcell.KeyLeft || ev.Key() == tcell.KeyCtrlB || (ev.Key() == tcell.KeyRune && ev.Rune() == 'b' && ev.Modifiers() == tcell.ModCtrl) || (r.Mode != ModeInsert && ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == 0) {
@@ -346,12 +349,12 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		start := r.Cursor
 		_, lineEnd := r.currentLineBounds()
 		end := lineEnd
-			if start < end {
-				if r.Buf.RuneAt(start) == '\n' {
-					end = start + 1
-				} else if end > start && r.Buf.RuneAt(end-1) == '\n' {
-					end = end - 1
-				}
+		if start < end {
+			if r.Buf.RuneAt(start) == '\n' {
+				end = start + 1
+			} else if end > start && r.Buf.RuneAt(end-1) == '\n' {
+				end = end - 1
+			}
 			if end > start {
 				text := string(r.Buf.Slice(start, end))
 				_ = r.deleteRange(start, end, text)
