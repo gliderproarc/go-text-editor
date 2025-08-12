@@ -153,6 +153,14 @@ func (g *GapBuffer) Len() int {
 	return len(g.buf) - (g.gapEnd - g.gapStart)
 }
 
+// RuneAt returns the rune at index i. If i is out of bounds, it returns 0.
+func (g *GapBuffer) RuneAt(i int) rune {
+	if i < 0 || i >= g.Len() {
+		return 0
+	}
+	return g.runeAt(i)
+}
+
 func (g *GapBuffer) runeAt(i int) rune {
 	if i < g.gapStart {
 		return g.buf[i]
@@ -212,7 +220,7 @@ func (g *GapBuffer) String() string {
 // buffer is modified.
 func (g *GapBuffer) Lines() []string {
 	if !g.cacheValid {
-		g.String()
+		_ = g.String()
 	}
 	return g.cacheLines
 }
