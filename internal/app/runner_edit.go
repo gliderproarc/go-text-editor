@@ -67,27 +67,42 @@ func (r *Runner) deleteRange(start, end int, text string) error {
 
 // moveCursorVertical moves the cursor up or down by delta lines, preserving the column when possible.
 func (r *Runner) moveCursorVertical(delta int) {
-	if r.Buf == nil || r.Buf.Len() == 0 {
+	if r.Buf == nil || r.Buf.Len() == 0 || delta == 0 {
 		return
 	}
-	line := 0
-	lineStart := 0
-	for i := 0; i < r.Cursor && i < r.Buf.Len(); i++ {
-		if string(r.Buf.Slice(i, i+1)) == "\n" {
-			line++
-			lineStart = i + 1
+	// find start of current line and column by scanning backwards
+	start := r.Cursor
+	for start > 0 && r.Buf.RuneAt(start-1) != '\n' {
+		start--
+	}
+	col := r.Cursor - start
+	pos := start
+	if delta > 0 {
+		for i := 0; i < delta && pos < r.Buf.Len(); i++ {
+			for pos < r.Buf.Len() && r.Buf.RuneAt(pos) != '\n' {
+				pos++
+			}
+			if pos < r.Buf.Len() {
+				pos++
+			}
+		}
+	} else {
+		for i := 0; i > delta && pos > 0; i-- {
+			pos--
+			for pos > 0 && r.Buf.RuneAt(pos-1) != '\n' {
+				pos--
+			}
 		}
 	}
-	col := r.Cursor - lineStart
-	start, end := r.Buf.LineAt(line + delta)
-	lineLen := end - start
-	if lineLen > 0 && string(r.Buf.Slice(end-1, end)) == "\n" {
-		lineLen--
+	end := pos
+	for end < r.Buf.Len() && r.Buf.RuneAt(end) != '\n' {
+		end++
 	}
+	lineLen := end - pos
 	if col > lineLen {
 		col = lineLen
 	}
-	r.Cursor = start + col
+	r.Cursor = pos + col
 	if r.Screen != nil {
 		r.ensureCursorVisible()
 	}
@@ -95,12 +110,19 @@ func (r *Runner) moveCursorVertical(delta int) {
 
 // currentLineBounds returns the rune start and end indices for the current cursor's line.
 func (r *Runner) currentLineBounds() (start, end int) {
-	// compute line index by counting newlines up to cursor
-	line := 0
-	for i := 0; i < r.Cursor && i < r.Buf.Len(); i++ {
-		if string(r.Buf.Slice(i, i+1)) == "\n" {
-			line++
-		}
+	if r.Buf == nil || r.Buf.Len() == 0 {
+		return 0, 0
 	}
-	return r.Buf.LineAt(line)
+	start = r.Cursor
+	for start > 0 && r.Buf.RuneAt(start-1) != '\n' {
+		start--
+	}
+	end = r.Cursor
+	for end < r.Buf.Len() && r.Buf.RuneAt(end) != '\n' {
+		end++
+	}
+	if end < r.Buf.Len() {
+		end++
+	}
+	return start, end
 }
