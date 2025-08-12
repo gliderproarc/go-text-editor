@@ -26,6 +26,7 @@ type Runner struct {
 	FilePath    string
 	Buf         *buffer.GapBuffer
 	Cursor      int // cursor position in runes
+	TopLine     int // first visible line index
 	Dirty       bool
 	Ed          *editor.Editor
 	ShowHelp    bool
@@ -52,6 +53,42 @@ func New() *Runner {
 	bs := editor.BufferState{Buf: buffer.NewGapBuffer(0)}
 	ed.AddBuffer(bs)
 	return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Ed: ed}
+}
+
+// cursorLine returns the current 0-based line index of the cursor.
+func (r *Runner) cursorLine() int {
+	if r.Buf == nil {
+		return 0
+	}
+	line := 0
+	for i := 0; i < r.Cursor && i < r.Buf.Len(); i++ {
+		if string(r.Buf.Slice(i, i+1)) == "\n" {
+			line++
+		}
+	}
+	return line
+}
+
+// ensureCursorVisible adjusts TopLine so the cursor lies within the viewport.
+func (r *Runner) ensureCursorVisible() {
+	if r.Screen == nil {
+		return
+	}
+	_, height := r.Screen.Size()
+	mbHeight := len(r.MiniBuf)
+	maxLines := height - 1 - mbHeight
+	if maxLines <= 0 {
+		maxLines = 1
+	}
+	line := r.cursorLine()
+	if line < r.TopLine {
+		r.TopLine = line
+	} else if line >= r.TopLine+maxLines {
+		r.TopLine = line - maxLines + 1
+	}
+	if r.TopLine < 0 {
+		r.TopLine = 0
+	}
 }
 
 func (r *Runner) saveBufferState() {

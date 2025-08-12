@@ -84,14 +84,14 @@ func (r *Runner) showDialog(message string) {
 	}
 }
 
-func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool, mode Mode, minibuf []string) {
+func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool, mode Mode, topLine int, minibuf []string) {
 	if buf == nil {
-		drawFile(s, fname, []string{}, highlights, cursor, dirty, mode, minibuf)
+		drawFile(s, fname, []string{}, highlights, cursor, dirty, mode, topLine, minibuf)
 		return
 	}
 	content := buf.String()
 	lines := strings.Split(content, "\n")
-	drawFile(s, fname, lines, highlights, cursor, dirty, mode, minibuf)
+	drawFile(s, fname, lines, highlights, cursor, dirty, mode, topLine, minibuf)
 }
 
 // draw renders the buffer with optional highlights and current visual selection.
@@ -99,13 +99,14 @@ func (r *Runner) draw(highlights []search.Range) {
 	if r.Screen == nil {
 		return
 	}
+	r.ensureCursorVisible()
 	if vh := r.visualHighlightRange(); len(vh) > 0 {
 		highlights = append(highlights, vh...)
 	}
-	drawBuffer(r.Screen, r.Buf, r.FilePath, highlights, r.Cursor, r.Dirty, r.Mode, r.MiniBuf)
+	drawBuffer(r.Screen, r.Buf, r.FilePath, highlights, r.Cursor, r.Dirty, r.Mode, r.TopLine, r.MiniBuf)
 }
 
-func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode, minibuf []string) {
+func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode, topLine int, minibuf []string) {
 	width, height := s.Size()
 	s.Clear()
 	mbHeight := len(minibuf)
@@ -115,6 +116,10 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 	}
 	lineStart := 0     // byte offset of start of current line
 	lineStartRune := 0 // rune offset of start of current line
+	for i := 0; i < topLine && i < len(lines); i++ {
+		lineStart += len([]byte(lines[i])) + 1
+		lineStartRune += len([]rune(lines[i])) + 1
+	}
 	cursorColor := tcell.ColorWhite
 	switch mode {
 	case ModeInsert:
@@ -123,8 +128,8 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 		cursorColor = tcell.ColorGreen
 	}
 	cursorStyle := tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(cursorColor).Attributes(tcell.AttrBlink)
-	for i := 0; i < maxLines && i < len(lines); i++ {
-		line := lines[i]
+	for i := 0; i < maxLines && topLine+i < len(lines); i++ {
+		line := lines[topLine+i]
 		runes := []rune(line)
 		// compute highlights for this line as rune index intervals
 		hl := make([]bool, len(runes))
