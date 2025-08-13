@@ -37,6 +37,7 @@ func drawHelp(s tcell.Screen) {
 		"- Ctrl+W: Search",
 		"- Alt+G: Go to line",
 		"- Ctrl+K: Cut to end of line",
+		"- dd: Delete line (normal mode)",
 		"- Ctrl+U/Ctrl+Y: Paste",
 		"- Ctrl+Z / Ctrl+Y: Undo / Redo",
 		"- Ctrl+A/Ctrl+E: Line start/end (insert)",
