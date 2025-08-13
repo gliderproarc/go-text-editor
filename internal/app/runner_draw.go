@@ -14,6 +14,7 @@ type renderState struct {
     cursor     int
     dirty      bool
     mode       Mode
+    overlay    Overlay
     topLine    int
     miniBuf    []string
     highlights []search.Range
@@ -99,12 +100,12 @@ func (r *Runner) showDialog(message string) {
 	r.draw(nil)
 }
 
-func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool, mode Mode, topLine int, minibuf []string, th config.Theme) {
+func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool, mode Mode, overlay Overlay, topLine int, minibuf []string, th config.Theme) {
     if buf == nil {
-        drawFile(s, fname, []string{}, highlights, cursor, dirty, mode, topLine, minibuf, th)
+        drawFile(s, fname, []string{}, highlights, cursor, dirty, mode, overlay, topLine, minibuf, th)
         return
     }
-    drawFile(s, fname, buf.Lines(), highlights, cursor, dirty, mode, topLine, minibuf, th)
+    drawFile(s, fname, buf.Lines(), highlights, cursor, dirty, mode, overlay, topLine, minibuf, th)
 }
 
 // renderSnapshot captures the current runner state into a renderState.
@@ -130,6 +131,7 @@ func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
         cursor:     r.Cursor,
         dirty:      r.Dirty,
         mode:       r.Mode,
+        overlay:    r.Overlay,
         topLine:    r.TopLine,
         miniBuf:    mini,
         highlights: hs,
@@ -146,7 +148,7 @@ func renderToScreen(s tcell.Screen, st renderState) {
         return
     }
     if st.bufLen > 0 {
-        drawFile(s, st.filePath, st.lines, st.highlights, st.cursor, st.dirty, st.mode, st.topLine, st.miniBuf, st.theme)
+        drawFile(s, st.filePath, st.lines, st.highlights, st.cursor, st.dirty, st.mode, st.overlay, st.topLine, st.miniBuf, st.theme)
     } else {
         drawUI(s, st.theme)
     }
@@ -175,7 +177,7 @@ func (r *Runner) draw(highlights []search.Range) {
     renderToScreen(r.Screen, snapshot)
 }
 
-func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode, topLine int, minibuf []string, th config.Theme) {
+func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode, overlay Overlay, topLine int, minibuf []string, th config.Theme) {
     width, height := s.Size()
     s.Clear()
     // set default UI style
@@ -195,6 +197,8 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
     switch mode {
     case ModeInsert:
         cursorColor = th.CursorInsertBG
+    case ModeVisual:
+        cursorColor = th.CursorVisualBG
     case ModeNormal:
         cursorColor = th.CursorNormalBG
     }
@@ -246,7 +250,7 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
                             // default background highlight (search/selection)
                             bgHL[ri] = true
                             bgGroup[ri] = "bg.search"
-                        case "bg.search", "bg.search.current":
+                        case "bg.search", "bg.search.current", "bg.select":
                             // explicit background highlight kinds
                             bgHL[ri] = true
                             bgGroup[ri] = h.Group
@@ -271,6 +275,10 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
                 if g := bgGroup[j]; g == "bg.search.current" {
                     bg = th.HighlightSearchCurrentBG
                     fg = th.HighlightSearchCurrentFG
+                } else if g := bgGroup[j]; g == "bg.select" {
+                    // Subtle visual selection highlight
+                    bg = th.SelectBG
+                    fg = th.SelectFG
                 }
                 s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(fg).Background(bg))
             default:
@@ -302,30 +310,70 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 		lineStart += len([]byte(line)) + 1
 		lineStartRune += len(runes) + 1
 	}
-	display := fname
-	if display == "" {
-		display = "[No File]"
-	}
-	if dirty {
-		display += " [+]"
-	}
-	status := display + " — Press Ctrl+Q to exit"
-	if len(status) > width {
-		status = string([]rune(status)[:width])
-	}
+    display := fname
+    if display == "" {
+        display = "[No File]"
+    }
+    if dirty {
+        display += " [+]"
+    }
+    // status mode indicator
+    modeTag := "<N>"
+    switch overlay {
+    case OverlaySearch:
+        modeTag = "<S>"
+    case OverlayMenu:
+        modeTag = "<M>"
+    default:
+        switch mode {
+        case ModeInsert:
+            modeTag = "<I>"
+        case ModeVisual:
+            modeTag = "<V>"
+        default:
+            modeTag = "<N>"
+        }
+    }
+    status := modeTag + "  " + display + " — Press Ctrl+Q to exit"
+    if len(status) > width {
+        status = string([]rune(status)[:width])
+    }
+    // Colorize mode indicators: <N>, <V>, <I> match cursor; <M>=orange; <S>=red
+    modeColor := th.StatusForeground
+    switch overlay {
+    case OverlaySearch:
+        modeColor = tcell.ColorRed
+    case OverlayMenu:
+        modeColor = tcell.ColorOrange
+    default:
+        // match cursor color for mode
+        modeColor = cursorColor
+    }
     for i, r := range status {
-        s.SetContent(i, height-1, r, nil, tcell.StyleDefault.Foreground(th.StatusForeground).Background(th.StatusBackground))
+        style := tcell.StyleDefault.Foreground(th.StatusForeground).Background(th.StatusBackground)
+        if i < len(modeTag) {
+            style = tcell.StyleDefault.Foreground(modeColor).Background(th.StatusBackground).Attributes(tcell.AttrBold)
+        }
+        s.SetContent(i, height-1, r, nil, style)
     }
     // draw mini-buffer lines just above status bar
     for i, line := range minibuf {
         y := height - 1 - mbHeight + i
         runes := []rune(line)
+        // default style for mini-buffer text
+        defStyle := tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground)
+        // special-case mnemonic menu entry lines: " <key> - <name>"
+        isMnemonic := len(runes) >= 4 && runes[0] == ' ' && runes[2] == ' ' && runes[3] == '-'
         for x := 0; x < width; x++ {
             ch := ' '
+            style := defStyle
             if x < len(runes) {
                 ch = runes[x]
+                if isMnemonic && x == 1 { // color the key selector
+                    style = tcell.StyleDefault.Foreground(th.MenuKeyForeground).Background(th.MiniBackground)
+                }
             }
-            s.SetContent(x, y, ch, nil, tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground))
+            s.SetContent(x, y, ch, nil, style)
         }
     }
     s.Show()

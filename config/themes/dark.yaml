@@ -9,6 +9,7 @@ theme:
   # cursor.text: black
   # cursor.insert.bg: lightblue
   # cursor.normal.bg: darkgreen
+  # cursor.visual.bg: yellow
   # text.default: white
   # highlight.search.bg: darkolivegreen
   # highlight.search.fg: white
@@ -20,4 +21,3 @@ theme:
   # syntax.number: lightyellow
   # syntax.type: lightblue
   # syntax.function: lightcyan
-

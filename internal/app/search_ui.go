@@ -15,6 +15,9 @@ func (r *Runner) runSearchPrompt() {
     if r.Screen == nil {
         return
     }
+    // Show search overlay so status bar displays <S>
+    r.Overlay = OverlaySearch
+    defer func() { r.Overlay = OverlayNone }()
     query := ""
     sel := 0 // selected match index within current results
     for {

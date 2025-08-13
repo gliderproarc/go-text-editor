@@ -17,9 +17,19 @@ import (
 type Mode int
 
 const (
-	ModeNormal Mode = iota
-	ModeInsert
-	ModeVisual
+    ModeNormal Mode = iota
+    ModeInsert
+    ModeVisual
+)
+
+// Overlay represents transient UI states that override status indicator
+// such as search or menu prompts shown in the mini-buffer.
+type Overlay int
+
+const (
+    OverlayNone Overlay = iota
+    OverlaySearch
+    OverlayMenu
 )
 
 // Runner owns the terminal lifecycle and a minimal event loop.
@@ -46,11 +56,13 @@ type Runner struct {
     themeIndex  int
     EventCh     chan tcell.Event
     RenderCh    chan renderState
-	PendingG    bool
-	PendingD    bool
-	Syntax      plugins.Highlighter
-	syntaxSrc   string
-	syntaxCache []search.Range
+    PendingG    bool
+    PendingD    bool
+    Syntax      plugins.Highlighter
+    syntaxSrc   string
+    syntaxCache []search.Range
+    // current transient overlay (search/menu) to inform status bar
+    Overlay     Overlay
 }
 
 func (r *Runner) setMiniBuffer(lines []string) {

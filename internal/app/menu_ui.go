@@ -45,10 +45,13 @@ func (r *Runner) commandList() []command {
 // fuzzy filtering by typing and navigation with Ctrl+P/Ctrl+N. Enter executes
 // the highlighted command. It returns true if the command requests to quit.
 func (r *Runner) runCommandMenu() bool {
-	if r.Screen == nil {
-		return false
-	}
-	cmds := r.commandList()
+    if r.Screen == nil {
+        return false
+    }
+    // Show menu overlay so status bar displays <M>
+    r.Overlay = OverlayMenu
+    defer func() { r.Overlay = OverlayNone }()
+    cmds := r.commandList()
 	query := ""
 	sel := 0
 	filtered := cmds

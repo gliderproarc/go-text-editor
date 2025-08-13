@@ -17,11 +17,17 @@ type Theme struct {
     StatusForeground tcell.Color
     MiniBackground   tcell.Color
     MiniForeground   tcell.Color
+    // Accents
+    MenuKeyForeground tcell.Color
 
     // Cursor styles
     CursorText     tcell.Color
     CursorInsertBG tcell.Color
     CursorNormalBG tcell.Color
+    CursorVisualBG tcell.Color
+    // Visual selection (distinct from search matches)
+    SelectBG tcell.Color
+    SelectFG tcell.Color
 
     // Text defaults
     TextDefault tcell.Color
@@ -46,10 +52,17 @@ func DefaultTheme() Theme {
         StatusForeground: tcell.ColorBlack,
         MiniBackground:   tcell.ColorWhite,
         MiniForeground:   tcell.ColorBlack,
+        MenuKeyForeground: tcell.ColorFuchsia,
 
         CursorText:     tcell.ColorBlack,
+        // Mode cursor colors: Insert=blue, Normal=green, Visual=yellow
         CursorInsertBG: tcell.ColorBlue,
         CursorNormalBG: tcell.ColorGreen,
+        CursorVisualBG: tcell.ColorYellow,
+
+        // Subtle visual selection: slightly brighter than dark bg
+        SelectBG: tcell.ColorGray,
+        SelectFG: tcell.ColorWhite,
 
         TextDefault: tcell.ColorWhite,
 
@@ -84,11 +97,19 @@ func TerminalTheme() Theme {
         StatusForeground: tcell.ColorDefault,
         MiniBackground:   tcell.ColorGray,
         MiniForeground:   tcell.ColorDefault,
+        MenuKeyForeground: tcell.ColorFuchsia,
 
         // Cursor uses palette colors; text under cursor uses default fg/bg
-        CursorText:     tcell.ColorDefault,
+        // Bright point with dark glyph for legibility
+        CursorText:     tcell.ColorBlack,
+        // Insert=blue, Normal=green, Visual=yellow
         CursorInsertBG: tcell.ColorBlue,
         CursorNormalBG: tcell.ColorGreen,
+        CursorVisualBG: tcell.ColorYellow,
+
+        // Subtle visual selection using bright black (gray)
+        SelectBG: tcell.ColorGray,
+        SelectFG: tcell.ColorDefault,
 
         // Default text inherits terminal default foreground
         TextDefault: tcell.ColorDefault,
@@ -124,13 +145,20 @@ var BuiltinThemes = map[string]Theme{
         StatusForeground: tcell.ColorWhite,
         MiniBackground:   tcell.ColorGray,
         MiniForeground:   tcell.ColorWhite,
+        MenuKeyForeground: tcell.ColorFuchsia,
 
         CursorText:     tcell.ColorBlack,
         CursorInsertBG: tcell.ColorLightBlue,
         CursorNormalBG: tcell.ColorDarkGreen,
+        CursorVisualBG: tcell.ColorYellow,
+
+        // Subtle visual selection on dark background
+        SelectBG: tcell.ColorGray,
+        SelectFG: tcell.ColorWhite,
 
         TextDefault: tcell.ColorWhite,
 
+        // Keep search highlight distinct and visible
         HighlightSearchBG:        tcell.ColorDarkOliveGreen,
         HighlightSearchFG:        tcell.ColorWhite,
         HighlightSearchCurrentBG: tcell.ColorBlue,

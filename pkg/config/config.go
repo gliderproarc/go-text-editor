@@ -127,6 +127,8 @@ func Load(path string) (*Config, error) {
                 cfg.Theme.CursorInsertBG = ParseColor(v, cfg.Theme.CursorInsertBG)
             case "cursor.normal.bg", "cursor.normal.background":
                 cfg.Theme.CursorNormalBG = ParseColor(v, cfg.Theme.CursorNormalBG)
+            case "cursor.visual.bg", "cursor.visual.background":
+                cfg.Theme.CursorVisualBG = ParseColor(v, cfg.Theme.CursorVisualBG)
             case "text.default", "text.fg":
                 cfg.Theme.TextDefault = ParseColor(v, cfg.Theme.TextDefault)
             case "highlight.search.bg":

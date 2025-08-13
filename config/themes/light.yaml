@@ -11,6 +11,7 @@ theme:
   # cursor.text: black
   # cursor.insert.bg: blue
   # cursor.normal.bg: green
+  # cursor.visual.bg: yellow
   # text.default: white
   # highlight.search.bg: yellow
   # highlight.search.fg: black

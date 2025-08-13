@@ -84,9 +84,10 @@ func importBase16(s string) Theme {
     t.MiniBackground = t.StatusBackground
     t.MiniForeground = t.StatusForeground
 
-    // Cursor styles from blue/green
+    // Cursor styles from blue/green/yellow
     t.CursorInsertBG = get("base0d", t.CursorInsertBG)
     t.CursorNormalBG = get("base0b", t.CursorNormalBG)
+    t.CursorVisualBG = get("base0a", t.CursorVisualBG)
     t.CursorText = t.UIBackground
 
     // Search highlights
@@ -161,6 +162,7 @@ func importAlacritty(s string) Theme {
     // Cursor
     t.CursorInsertBG = getPath("colors.normal.blue", t.CursorInsertBG)
     t.CursorNormalBG = getPath("colors.normal.green", t.CursorNormalBG)
+    t.CursorVisualBG = getPath("colors.normal.yellow", t.CursorVisualBG)
     t.CursorText = getPath("colors.cursor.text", t.UIBackground)
     if t.CursorText == tcell.ColorDefault {
         t.CursorText = t.UIBackground

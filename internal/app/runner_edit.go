@@ -43,7 +43,8 @@ func (r *Runner) visualHighlightRange() []search.Range {
 	}
 	startBytes := len(string(runes[:start]))
 	endBytes := len(string(runes[:end]))
-	return []search.Range{{Start: startBytes, End: endBytes}}
+    // Tag as visual selection so renderer can style it subtly
+    return []search.Range{{Start: startBytes, End: endBytes, Group: "bg.select"}}
 }
 
 // insertText inserts text at the current cursor, records history, and updates state.

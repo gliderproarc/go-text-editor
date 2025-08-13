@@ -81,10 +81,13 @@ func (r *Runner) mnemonicMenu() []*mnemonicNode {
 }
 
 func (r *Runner) runMnemonicMenu() bool {
-	if r.Screen == nil {
-		return false
-	}
-	root := &mnemonicNode{children: r.mnemonicMenu()}
+    if r.Screen == nil {
+        return false
+    }
+    // Show menu overlay so status bar displays <M>
+    r.Overlay = OverlayMenu
+    defer func() { r.Overlay = OverlayNone }()
+    root := &mnemonicNode{children: r.mnemonicMenu()}
 	node := root
 	path := ""
 	for {
