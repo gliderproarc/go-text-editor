@@ -38,6 +38,9 @@ func WordEnd(g *GapBuffer, pos int) int {
 	if pos >= g.Len() {
 		return g.Len() - 1
 	}
+	if IsWordRune(g.RuneAt(pos)) && (pos == g.Len()-1 || !IsWordRune(g.RuneAt(pos+1))) {
+		pos++
+	}
 	for pos < g.Len() && !IsWordRune(g.RuneAt(pos)) {
 		pos++
 	}

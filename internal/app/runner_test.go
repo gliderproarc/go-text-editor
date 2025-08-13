@@ -279,11 +279,6 @@ func TestWordMotionsNormalMode(t *testing.T) {
 		t.Fatalf("expected cursor at 2 after 'e', got %d", r.Cursor)
 	}
 
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'w', 0))
-	if r.Cursor != 4 {
-		t.Fatalf("expected cursor at 4 after 'w', got %d", r.Cursor)
-	}
-
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'e', 0))
 	if r.Cursor != 6 {
 		t.Fatalf("expected cursor at 6 after second 'e', got %d", r.Cursor)
@@ -297,6 +292,25 @@ func TestWordMotionsNormalMode(t *testing.T) {
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
 	if r.Cursor != 0 {
 		t.Fatalf("expected cursor at 0 after second 'b', got %d", r.Cursor)
+	}
+
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'w', 0))
+	if r.Cursor != 4 {
+		t.Fatalf("expected cursor at 4 after 'w', got %d", r.Cursor)
+	}
+}
+
+func TestWordEndVisualMode(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("one two"), Mode: ModeVisual, VisualStart: 0}
+
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'e', 0))
+	if r.Cursor != 2 {
+		t.Fatalf("expected cursor at 2 after 'e', got %d", r.Cursor)
+	}
+
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'e', 0))
+	if r.Cursor != 6 {
+		t.Fatalf("expected cursor at 6 after second 'e', got %d", r.Cursor)
 	}
 }
 
