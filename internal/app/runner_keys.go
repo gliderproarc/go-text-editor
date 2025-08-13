@@ -89,7 +89,12 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.draw(nil)
 			}
 			return false
+		case ' ':
+			return r.runMnemonicMenu()
 		}
+	}
+	if r.Mode == ModeInsert && ev.Key() == tcell.KeyRune && ev.Rune() == 'm' && ev.Modifiers() == tcell.ModAlt {
+		return r.runMnemonicMenu()
 	}
 	if r.Mode == ModeVisual && ev.Key() == tcell.KeyRune && ev.Rune() == 'v' && ev.Modifiers() == 0 {
 		r.Mode = ModeNormal
