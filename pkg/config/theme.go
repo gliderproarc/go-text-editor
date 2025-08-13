@@ -69,10 +69,53 @@ func DefaultTheme() Theme {
     }
 }
 
+// TerminalTheme leverages terminal-provided defaults and ANSI palette colors
+// so the editor follows the user's terminal theme. It intentionally avoids
+// hard-coded RGB values and instead uses default/standard palette entries.
+func TerminalTheme() Theme {
+    return Theme{
+        // Use terminal default foreground/background for the main UI
+        UIBackground: tcell.ColorDefault,
+        UIForeground: tcell.ColorDefault,
+
+        // Status/mini bars: use bright black (gray) background which
+        // reads naturally on dark terminals, with default foreground.
+        StatusBackground: tcell.ColorGray,
+        StatusForeground: tcell.ColorDefault,
+        MiniBackground:   tcell.ColorGray,
+        MiniForeground:   tcell.ColorDefault,
+
+        // Cursor uses palette colors; text under cursor uses default fg/bg
+        CursorText:     tcell.ColorDefault,
+        CursorInsertBG: tcell.ColorBlue,
+        CursorNormalBG: tcell.ColorGreen,
+
+        // Default text inherits terminal default foreground
+        TextDefault: tcell.ColorDefault,
+
+        // Highlights use palette colors; foreground falls back to default
+        HighlightSearchBG:        tcell.ColorYellow,
+        HighlightSearchFG:        tcell.ColorDefault,
+        HighlightSearchCurrentBG: tcell.ColorBlue,
+        HighlightSearchCurrentFG: tcell.ColorDefault,
+
+        // Syntax groups mapped to ANSI palette; actual shades come from terminal
+        SyntaxColors: map[string]tcell.Color{
+            "keyword":  tcell.ColorRed,
+            "string":   tcell.ColorGreen,
+            "comment":  tcell.ColorGray,   // often maps to bright black
+            "number":   tcell.ColorYellow,
+            "type":     tcell.ColorBlue,
+            "function": tcell.ColorAqua,
+        },
+    }
+}
+
 // BuiltinThemes exposes a couple of presets by name.
 var BuiltinThemes = map[string]Theme{
-    "default": DefaultTheme(),
-    "light":   DefaultTheme(),
+    "default":  DefaultTheme(),
+    "light":    DefaultTheme(),
+    "terminal": TerminalTheme(),
     "dark": {
         UIBackground: tcell.ColorBlack,
         UIForeground: tcell.ColorWhite,

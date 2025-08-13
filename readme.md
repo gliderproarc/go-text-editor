@@ -333,7 +333,7 @@ Reference Plugin (for milestone M8)
 File: ~/.<project>/config.yaml (or local .editorconfig.yaml in project root)
 
 theme:
-  preset: "light" # or "dark"; or omit to use defaults
+  preset: "light" # or "dark" or "terminal"; omit to use defaults (terminal)
   # Optional overrides (any of these keys)
   # ui.background: black
   # ui.foreground: white
@@ -357,6 +357,14 @@ theme:
   # syntax.function: blue
 
 Using Base16 or Alacritty themes
+Terminal theme (follow terminal palette)
+- Use the built-in terminal-compliant theme to piggy-back on your terminal's colors. It avoids hard-coded RGB values and relies on the terminal's default fg/bg and standard ANSI palette for UI and syntax.
+  theme:
+    preset: "terminal"
+
+Defaults
+- If you omit the theme block entirely, the editor loads with the terminal-compliant theme by default.
+
 - Base16: point to any Base16 YAML (keys base00..base0F) and optionally override:
   theme:
     file: "/absolute/path/to/base16-scheme.yaml"

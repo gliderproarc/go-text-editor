@@ -21,6 +21,7 @@ func (r *Runner) initThemeList() {
     list := []themeEntry{
         {Name: "default"},
         {Name: "light"},
+        {Name: "terminal"},
         {Name: "dark"},
     }
     // Add any YAML files under ./config/themes
@@ -88,4 +89,3 @@ func (r *Runner) PrevTheme() {
     r.themeIndex = (r.themeIndex - 1 + len(r.themeList)) % len(r.themeList)
     r.applyThemeEntry(r.themeList[r.themeIndex])
 }
-

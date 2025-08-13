@@ -79,7 +79,8 @@ func New() *Runner {
     ed := editor.New()
     bs := editor.BufferState{Buf: buffer.NewGapBuffer(0)}
     ed.AddBuffer(bs)
-    return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Theme: config.DefaultTheme(), Ed: ed}
+    // Start with terminal-compliant theme so the app follows terminal colors
+    return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Theme: config.TerminalTheme(), Ed: ed}
 }
 
 // cursorLine returns the current 0-based line index of the cursor.

@@ -1,4 +1,4 @@
-# Example theme: light (defaults)
+# Example theme: light
 theme:
   preset: light
   # You can override any keys below
@@ -22,4 +22,3 @@ theme:
   # syntax.number: yellow
   # syntax.type: blue
   # syntax.function: blue
-

@@ -24,7 +24,9 @@ type Config struct {
 
 // Default returns a Config with default key mappings.
 func Default() *Config {
-    return &Config{Keymap: DefaultKeymap(), Theme: DefaultTheme()}
+    // Default to the terminal-compliant theme so the editor inherits
+    // the user's terminal colors when no config is provided.
+    return &Config{Keymap: DefaultKeymap(), Theme: TerminalTheme()}
 }
 
 // DefaultKeymap provides builtin command bindings.
