@@ -367,6 +367,7 @@ go test ./... -run . -v
 	•	M8: Plugin manager (JSON-RPC stdio) + sample plugin.
 	•	M9: Piece table option; perf tests.
 	•	M10: Smooth scrolling & viewport engine.
+	•	M11: Syntax highlighting via tree-sitter plugin.
 
 ⸻
 
@@ -383,7 +384,6 @@ MIT (proposed).
 ⸻
 
 16) Future Ideas
-	•	Syntax highlighting (plugin-provided, e.g., tree-sitter via external process).
 	•	LSP integration as a plugin (stdio), surfacing actions through the contextual menu.
 	•	Macro recording/replay.
 	•	Session persistence & MRU lists.
@@ -434,17 +434,18 @@ Completed (high level)
 - Extras: Help screen (F1/Ctrl+H), dirty-quit confirmation, basic normal/insert/visual modes, logging hooks.
 - M5: Config and keymaps: load ~/.texteditor/config.yaml to remap quit/save/search.
 - M6: Multiple buffers with open-in-new-buffer and buffer switching.
+- M7: Contextual command menu with fuzzy filtering (F2) and command execution.
 
 Next Milestones (proposal)
-- M7 — Contextual Command Menu v1
-  - Tasks: pkg/menu with command registry and fuzzy filter; popup UI; wire core commands with names/when-predicates.
-  - Files: pkg/menu/*, internal/app/runner.go (F2 handler), pkg/commands (metadata), tests for filtering and execution.
-  - Acceptance: pressing F2 shows commands; filtering works; selecting executes the command; smoke tests cover menu flow.
+- M8 — Plugin API v0
+  - Tasks: JSON-RPC stdio handshake, command registration, example wordcount plugin.
+  - Files: pkg/plugins/*, internal/app/runner.go (plugin host), tests for handshake and command execution.
+  - Acceptance: editor discovers and executes external plugin commands.
 
-Upcoming (after M7)
-- M8 — Plugin API v0: JSON-RPC stdio, minimal capabilities, reference plugin (wordcount/toggle-comment).
-- M9 — Quality & Performance: piece table option behind TextStorage, large-file tests and thresholds, profiling.
-- M10 — Smooth Scrolling & Viewport Engine: adjust viewport offset when cursor moves and add tests for edge cases.
+Upcoming (after M8)
+- M9 — Syntax Highlighting: integrate tree-sitter via plugin; render highlighted tokens.
+- M10 — Quality & Performance: piece table option behind TextStorage, large-file tests and thresholds, profiling.
+- M11 — Smooth Scrolling & Viewport Engine: adjust viewport offset when cursor moves and add tests for edge cases.
 
 Notes
 - The existing UI already includes open/save prompts, search/go-to, and quit confirmation; the plan above focuses on configurability and multi-buffer ergonomics next.
