@@ -33,6 +33,7 @@ type Runner struct {
 	ShowHelp    bool
 	Mode        Mode
 	VisualStart int
+	VisualLine  bool
 	History     *history.History
 	KillRing    history.KillRing
 	Logger      *logs.Logger

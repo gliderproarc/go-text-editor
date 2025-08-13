@@ -285,9 +285,8 @@ func TestGotoTopAndBottomNormalMode(t *testing.T) {
 	if last > 0 && len(lines[last]) == 0 {
 		last--
 	}
-	start, _ := r.Buf.LineAt(last)
-	if r.Cursor != start || r.CursorLine != last {
-		t.Fatalf("expected cursor at start of last line after G, got %d line %d", r.Cursor, r.CursorLine)
+	if r.Cursor != r.Buf.Len()-1 || r.CursorLine != last {
+		t.Fatalf("expected cursor at last char after G, got %d line %d", r.Cursor, r.CursorLine)
 	}
 }
 
@@ -320,9 +319,8 @@ func TestVisualGotoTopAndBottom(t *testing.T) {
 	if last > 0 && len(lines[last]) == 0 {
 		last--
 	}
-	start, _ := r.Buf.LineAt(last)
-	if r.Cursor != start || r.CursorLine != last {
-		t.Fatalf("expected cursor at start of last line after G, got %d line %d", r.Cursor, r.CursorLine)
+	if r.Cursor != r.Buf.Len()-1 || r.CursorLine != last {
+		t.Fatalf("expected cursor at last char after G, got %d line %d", r.Cursor, r.CursorLine)
 	}
 }
 
@@ -355,6 +353,19 @@ func TestVisualCutX(t *testing.T) {
 	}
 	if r.Mode != ModeNormal {
 		t.Fatalf("expected mode normal after cut")
+	}
+}
+
+func TestVisualLineSelectionCut(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("abc\ndef\nghi"), KillRing: history.KillRing{}}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'V', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'j', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'x', 0))
+	if got := r.Buf.String(); got != "ghi" {
+		t.Fatalf("expected remaining text 'ghi', got %q", got)
+	}
+	if kr := r.KillRing.Get(); kr != "abc\ndef\n" {
+		t.Fatalf("expected kill ring to contain first two lines, got %q", kr)
 	}
 }
 func TestRunner_KillToEndOfLineAndYank(t *testing.T) {
