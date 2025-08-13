@@ -374,11 +374,11 @@ func TestVisualCutX(t *testing.T) {
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'l', 0))
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'l', 0))
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'x', 0))
-	if got := r.Buf.String(); got != "llo" {
-		t.Fatalf("expected buffer 'llo', got %q", got)
+	if got := r.Buf.String(); got != "lo" {
+		t.Fatalf("expected buffer 'lo', got %q", got)
 	}
-	if data := r.KillRing.Get(); data != "he" {
-		t.Fatalf("expected kill ring 'he', got %q", data)
+	if data := r.KillRing.Get(); data != "hel" {
+		t.Fatalf("expected kill ring 'hel', got %q", data)
 	}
 	if r.Mode != ModeNormal {
 		t.Fatalf("expected mode normal after cut")
@@ -455,8 +455,8 @@ func TestRunner_VisualYank(t *testing.T) {
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
 	// Yank selection
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', 0))
-	if got := r.KillRing.Get(); got != "el" {
-		t.Fatalf("expected kill ring to contain 'el', got %q", got)
+	if got := r.KillRing.Get(); got != "ell" {
+		t.Fatalf("expected kill ring to contain 'ell', got %q", got)
 	}
 	if r.Mode != ModeNormal {
 		t.Fatalf("expected mode to return to normal after yank")
@@ -469,6 +469,31 @@ func TestRunner_VisualYank(t *testing.T) {
 	}
 	if r.Cursor != 1 {
 		t.Fatalf("expected cursor at start of selection after yank, got %d", r.Cursor)
+	}
+}
+
+func TestRunner_VisualCutWord(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("word"), Cursor: 0, History: history.New()}
+	// Enter visual mode
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
+	// Select to end of word
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'e', 0))
+	// Cut selection
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'x', 0))
+	if got := r.KillRing.Get(); got != "word" {
+		t.Fatalf("expected kill ring to contain 'word', got %q", got)
+	}
+	if got := r.Buf.String(); got != "" {
+		t.Fatalf("expected buffer to be empty after cut, got %q", got)
+	}
+	if r.Cursor != 0 {
+		t.Fatalf("expected cursor reset to start after cut, got %d", r.Cursor)
+	}
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected mode to return to normal after cut")
+	}
+	if r.VisualStart != -1 {
+		t.Fatalf("expected visual start reset after cut")
 	}
 }
 
