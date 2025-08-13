@@ -271,6 +271,26 @@ func TestLineNavigationNormalMode(t *testing.T) {
 	}
 }
 
+func TestGotoTopAndBottomNormalMode(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("abc\ndef\nghi"), Cursor: 5, Mode: ModeNormal}
+	r.recomputeCursorLine()
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'g', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'g', 0))
+	if r.Cursor != 0 || r.CursorLine != 0 {
+		t.Fatalf("expected cursor at start after gg, got %d line %d", r.Cursor, r.CursorLine)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'G', 0))
+	lines := r.Buf.Lines()
+	last := len(lines) - 1
+	if last > 0 && len(lines[last]) == 0 {
+		last--
+	}
+	start, _ := r.Buf.LineAt(last)
+	if r.Cursor != start || r.CursorLine != last {
+		t.Fatalf("expected cursor at start of last line after G, got %d line %d", r.Cursor, r.CursorLine)
+	}
+}
+
 func TestLineNavigationVisualMode(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("abc\ndef"), Cursor: 1, Mode: ModeNormal}
 	// enter visual mode
