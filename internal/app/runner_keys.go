@@ -26,6 +26,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		case ModeVisual:
 			r.Mode = ModeNormal
 			r.VisualStart = -1
+			r.VisualLine = false
 			r.PendingG = false
 			r.draw(nil)
 			return false
@@ -52,6 +53,19 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		case 'v':
 			r.Mode = ModeVisual
 			r.VisualStart = r.Cursor
+			r.VisualLine = false
+			r.draw(nil)
+			return false
+		case 'V':
+			if r.Buf != nil {
+				start, _ := r.currentLineBounds()
+				r.Cursor = start
+				r.VisualStart = start
+			} else {
+				r.VisualStart = r.Cursor
+			}
+			r.Mode = ModeVisual
+			r.VisualLine = true
 			r.draw(nil)
 			return false
 		case 'p':
@@ -78,14 +92,13 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			}
 			return false
 		case 'G':
-			if r.Buf != nil {
+			if r.Buf != nil && r.Buf.Len() > 0 {
+				r.Cursor = r.Buf.Len() - 1
 				lines := r.Buf.Lines()
 				last := len(lines) - 1
 				if last > 0 && len(lines[last]) == 0 {
 					last--
 				}
-				start, _ := r.Buf.LineAt(last)
-				r.Cursor = start
 				r.CursorLine = last
 			}
 			if r.Screen != nil {
@@ -137,6 +150,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	if r.Mode == ModeVisual && ev.Key() == tcell.KeyRune && ev.Rune() == 'v' && ev.Modifiers() == 0 {
 		r.Mode = ModeNormal
 		r.VisualStart = -1
+		r.VisualLine = false
 		r.PendingG = false
 		r.draw(nil)
 		return false
@@ -449,14 +463,13 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 		r.PendingG = true
 		return false
 	case ev.Key() == tcell.KeyRune && ev.Rune() == 'G':
-		if r.Buf != nil {
+		if r.Buf != nil && r.Buf.Len() > 0 {
+			r.Cursor = r.Buf.Len() - 1
 			lines := r.Buf.Lines()
 			last := len(lines) - 1
 			if last > 0 && len(lines[last]) == 0 {
 				last--
 			}
-			start, _ := r.Buf.LineAt(last)
-			r.Cursor = start
 			r.CursorLine = last
 		}
 		r.draw(nil)
@@ -537,15 +550,12 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 		}
 		r.Mode = ModeInsert
 		r.VisualStart = -1
+		r.VisualLine = false
 		r.draw(nil)
 		return false
 	case ev.Key() == tcell.KeyRune && ev.Rune() == 'y' && ev.Modifiers() == 0:
 		if r.Buf != nil {
-			start := r.VisualStart
-			end := r.Cursor
-			if start > end {
-				start, end = end, start
-			}
+			start, end := r.visualSelectionBounds()
 			if start < end {
 				text := string(r.Buf.Slice(start, end))
 				r.KillRing.Set(text)
@@ -557,15 +567,12 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 		}
 		r.Mode = ModeNormal
 		r.VisualStart = -1
+		r.VisualLine = false
 		r.draw(nil)
 		return false
 	case ev.Key() == tcell.KeyRune && ev.Rune() == 'x' && ev.Modifiers() == 0:
 		if r.Buf != nil {
-			start := r.VisualStart
-			end := r.Cursor
-			if start > end {
-				start, end = end, start
-			}
+			start, end := r.visualSelectionBounds()
 			if start < end {
 				text := string(r.Buf.Slice(start, end))
 				_ = r.deleteRange(start, end, text)
@@ -578,6 +585,7 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 		}
 		r.Mode = ModeNormal
 		r.VisualStart = -1
+		r.VisualLine = false
 		r.draw(nil)
 		return false
 	}
