@@ -201,8 +201,10 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
         runes := []rune(line)
         // compute highlights for this line:
         // - bgHL marks background highlights (search/selection)
+        // - bgGroup stores background highlight category (e.g., "bg.search.current")
         // - fgGroup stores syntax group per rune (colored foreground)
         bgHL := make([]bool, len(runes))
+        bgGroup := make([]string, len(runes))
         fgGroup := make([]string, len(runes))
         if len(highlights) > 0 {
             lineBytesLen := len(line)
@@ -234,9 +236,17 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
                         endRune = len(runes)
                     }
                     for ri := startRune; ri < endRune && ri < len(runes); ri++ {
-                        if h.Group == "" {
+                        switch h.Group {
+                        case "":
+                            // default background highlight (search/selection)
                             bgHL[ri] = true
-                        } else {
+                            bgGroup[ri] = "bg.search"
+                        case "bg.search", "bg.search.current":
+                            // explicit background highlight kinds
+                            bgHL[ri] = true
+                            bgGroup[ri] = h.Group
+                        default:
+                            // syntax foreground coloring
                             fgGroup[ri] = h.Group
                         }
                     }
@@ -250,7 +260,14 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
             case runeIdx == cursor:
                 s.SetContent(j, i, ch, nil, cursorStyle)
             case j < len(bgHL) && bgHL[j]:
-                s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorYellow))
+                // choose background color based on bgGroup
+                bg := tcell.ColorYellow
+                fg := tcell.ColorBlack
+                if g := bgGroup[j]; g == "bg.search.current" {
+                    bg = tcell.ColorBlue
+                    fg = tcell.ColorWhite
+                }
+                s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(fg).Background(bg))
             default:
                 // syntax foreground coloring if present
                 if g := fgGroup[j]; g != "" {
