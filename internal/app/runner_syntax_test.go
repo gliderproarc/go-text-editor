@@ -18,9 +18,9 @@ func (f *fakeHighlighter) Highlight(src []byte) []search.Range {
 }
 
 func TestSyntaxHighlightsCacheInvalidation(t *testing.T) {
-	r := &Runner{Buf: buffer.NewGapBufferFromString("package main\n")}
-	fh := &fakeHighlighter{}
-	r.Syntax = fh
+    r := &Runner{Buf: buffer.NewGapBufferFromString("package main\n"), FilePath: "example.go"}
+    fh := &fakeHighlighter{}
+    r.Syntax = fh
 
 	r.syntaxHighlights()
 	if fh.calls != 1 {

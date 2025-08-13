@@ -43,27 +43,47 @@ func (t *TreeSitterPlugin) Highlight(src []byte) []search.Range {
 		return nil
 	}
 	root := tree.RootNode()
-	var ranges []search.Range
-	keywords := map[string]struct{}{
-		"break": {}, "case": {}, "chan": {}, "const": {}, "continue": {},
-		"default": {}, "defer": {}, "else": {}, "fallthrough": {}, "for": {},
-		"func": {}, "go": {}, "goto": {}, "if": {}, "import": {},
-		"interface": {}, "map": {}, "package": {}, "range": {}, "return": {},
-		"select": {}, "struct": {}, "switch": {}, "type": {}, "var": {},
-	}
-	var walk func(n *sitter.Node)
-	walk = func(n *sitter.Node) {
-		typ := n.Type()
-		if _, ok := keywords[typ]; ok {
-			ranges = append(ranges, search.Range{Start: int(n.StartByte()), End: int(n.EndByte())})
-		}
-		if typ == "comment" || typ == "interpreted_string_literal" || typ == "raw_string_literal" {
-			ranges = append(ranges, search.Range{Start: int(n.StartByte()), End: int(n.EndByte())})
-		}
-		for i := 0; i < int(n.ChildCount()); i++ {
-			walk(n.Child(i))
-		}
-	}
+    var ranges []search.Range
+    keywords := map[string]struct{}{
+        "break": {}, "case": {}, "chan": {}, "const": {}, "continue": {},
+        "default": {}, "defer": {}, "else": {}, "fallthrough": {}, "for": {},
+        "func": {}, "go": {}, "goto": {}, "if": {}, "import": {},
+        "interface": {}, "map": {}, "package": {}, "range": {}, "return": {},
+        "select": {}, "struct": {}, "switch": {}, "type": {}, "var": {},
+    }
+    var walk func(n *sitter.Node)
+    walk = func(n *sitter.Node) {
+        typ := n.Type()
+        if _, ok := keywords[typ]; ok {
+            ranges = append(ranges, search.Range{Start: int(n.StartByte()), End: int(n.EndByte()), Group: "keyword"})
+        }
+        if typ == "comment" {
+            ranges = append(ranges, search.Range{Start: int(n.StartByte()), End: int(n.EndByte()), Group: "comment"})
+        }
+        if typ == "interpreted_string_literal" || typ == "raw_string_literal" {
+            ranges = append(ranges, search.Range{Start: int(n.StartByte()), End: int(n.EndByte()), Group: "string"})
+        }
+        // common literal types in tree-sitter-go
+        if typ == "int_literal" || typ == "float_literal" || typ == "imaginary_literal" || typ == "rune_literal" {
+            ranges = append(ranges, search.Range{Start: int(n.StartByte()), End: int(n.EndByte()), Group: "number"})
+        }
+        // function and type names via field matching when available
+        // function_declaration: highlight the name identifier
+        if typ == "function_declaration" {
+            if child := n.ChildByFieldName("name"); child != nil {
+                ranges = append(ranges, search.Range{Start: int(child.StartByte()), End: int(child.EndByte()), Group: "function"})
+            }
+        }
+        // type_spec: highlight the defined type name
+        if typ == "type_spec" {
+            if child := n.ChildByFieldName("name"); child != nil {
+                ranges = append(ranges, search.Range{Start: int(child.StartByte()), End: int(child.EndByte()), Group: "type"})
+            }
+        }
+        for i := 0; i < int(n.ChildCount()); i++ {
+            walk(n.Child(i))
+        }
+    }
 	walk(root)
 	return ranges
 }

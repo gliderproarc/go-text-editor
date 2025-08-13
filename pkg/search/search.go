@@ -5,8 +5,11 @@ import "strings"
 // Range represents a byte-offset half-open interval [Start, End)
 // (for simplicity this package uses byte offsets; TextStorage may convert as needed).
 type Range struct {
-	Start int
-	End   int
+    Start int
+    End   int
+    // Group is an optional category for styling (e.g. "keyword", "string").
+    // Empty means generic highlight (used for search/selection background).
+    Group string
 }
 
 // SearchAll returns all non-overlapping occurrences of query in text as byte ranges.

@@ -78,6 +78,32 @@ Interactive example (typical session):
 Notes:
 - Search highlights and go-to behavior are implemented in M3. Highlight styles use a high-contrast background for visibility; theming and color configuration come later (M5).
 
+Tree-sitter Syntax Highlighting (Go)
+-----------------------------------
+This project ships optional tree-sitter-based highlighting for Go files.
+
+- Build with tag: use the `tree_sitter` build tag to enable it.
+
+    go build -tags tree_sitter ./cmd/texteditor
+
+- Run tests with tag: to validate the integration and related tests:
+
+    go test -tags tree_sitter ./...
+
+- Local caching (CI/sandbox friendly): if your environment restricts writes outside the workspace, set Go cache dirs to local folders (already present in the repo):
+
+    GOCACHE=$(pwd)/.gocache GOMODCACHE=$(pwd)/.gomodcache GOTMPDIR=$(pwd)/.gotmp go test -tags tree_sitter ./...
+
+What it does now
+- Colors Go syntax groups: keywords, strings, comments, numbers, and function/type names.
+- Renders syntax as colored foreground; search results and visual selections stay as a yellow background overlay and take precedence.
+- Auto-enables only for `.go` files to avoid extra work on other filetypes.
+- Caches highlight ranges and invalidates on edit for responsiveness.
+
+Planned next steps
+- Add theme configuration (per-group colors) and toggles.
+- Detect filetype via shebang/heuristics and support more languages.
+
 ⸻
 
 1) Project Phases & Milestones

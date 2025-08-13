@@ -186,61 +186,95 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 		cursorColor = tcell.ColorGreen
 	}
 	cursorStyle := tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(cursorColor).Attributes(tcell.AttrBlink)
-	for i := 0; i < maxLines && topLine+i < len(lines); i++ {
-		line := lines[topLine+i]
-		runes := []rune(line)
-		// compute highlights for this line as rune index intervals
-		hl := make([]bool, len(runes))
-		if len(highlights) > 0 {
-			lineBytesLen := len(line)
-			lineStartByte := lineStart
-			lineEndByte := lineStartByte + lineBytesLen
-			for _, h := range highlights {
-				if h.Start < lineEndByte && h.End > lineStartByte {
-					overlapStart := h.Start
-					if overlapStart < lineStartByte {
-						overlapStart = lineStartByte
-					}
-					overlapEnd := h.End
-					if overlapEnd > lineEndByte {
-						overlapEnd = lineEndByte
-					}
-					// convert byte offsets relative to line to rune indices
-					startRune := 0
-					endRune := 0
-					if overlapStart-lineStartByte > 0 {
-						startRune = len([]rune(line[:overlapStart-lineStartByte]))
-					}
-					if overlapEnd-lineStartByte > 0 {
-						endRune = len([]rune(line[:overlapEnd-lineStartByte]))
-					}
-					if startRune < 0 {
-						startRune = 0
-					}
-					if endRune > len(runes) {
-						endRune = len(runes)
-					}
-					for ri := startRune; ri < endRune && ri < len(hl); ri++ {
-						hl[ri] = true
-					}
-				}
-			}
-		}
-		for j := 0; j < width && j < len(runes); j++ {
-			ch := runes[j]
-			runeIdx := lineStartRune + j
-			switch {
-			case runeIdx == cursor:
-				s.SetContent(j, i, ch, nil, cursorStyle)
-			case j < len(hl) && hl[j]:
-				s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorYellow))
-			default:
-				s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
-			}
-		}
-		// if cursor at end of line, draw placeholder cell
-		if lineStartRune+len(runes) == cursor && len(runes) < width {
-			s.SetContent(len(runes), i, ' ', nil, cursorStyle)
+    // simple theme mapping for syntax groups
+    theme := map[string]tcell.Color{
+        "keyword":  tcell.ColorRed,
+        "string":   tcell.ColorGreen,
+        "comment":  tcell.ColorGray,
+        "number":   tcell.ColorYellow,
+        "type":     tcell.ColorBlue,
+        "function": tcell.ColorBlue,
+    }
+
+    for i := 0; i < maxLines && topLine+i < len(lines); i++ {
+        line := lines[topLine+i]
+        runes := []rune(line)
+        // compute highlights for this line:
+        // - bgHL marks background highlights (search/selection)
+        // - fgGroup stores syntax group per rune (colored foreground)
+        bgHL := make([]bool, len(runes))
+        fgGroup := make([]string, len(runes))
+        if len(highlights) > 0 {
+            lineBytesLen := len(line)
+            lineStartByte := lineStart
+            lineEndByte := lineStartByte + lineBytesLen
+            for _, h := range highlights {
+                if h.Start < lineEndByte && h.End > lineStartByte {
+                    overlapStart := h.Start
+                    if overlapStart < lineStartByte {
+                        overlapStart = lineStartByte
+                    }
+                    overlapEnd := h.End
+                    if overlapEnd > lineEndByte {
+                        overlapEnd = lineEndByte
+                    }
+                    // convert byte offsets relative to line to rune indices
+                    startRune := 0
+                    endRune := 0
+                    if overlapStart-lineStartByte > 0 {
+                        startRune = len([]rune(line[:overlapStart-lineStartByte]))
+                    }
+                    if overlapEnd-lineStartByte > 0 {
+                        endRune = len([]rune(line[:overlapEnd-lineStartByte]))
+                    }
+                    if startRune < 0 {
+                        startRune = 0
+                    }
+                    if endRune > len(runes) {
+                        endRune = len(runes)
+                    }
+                    for ri := startRune; ri < endRune && ri < len(runes); ri++ {
+                        if h.Group == "" {
+                            bgHL[ri] = true
+                        } else {
+                            fgGroup[ri] = h.Group
+                        }
+                    }
+                }
+            }
+        }
+        for j := 0; j < width && j < len(runes); j++ {
+            ch := runes[j]
+            runeIdx := lineStartRune + j
+            switch {
+            case runeIdx == cursor:
+                s.SetContent(j, i, ch, nil, cursorStyle)
+            case j < len(bgHL) && bgHL[j]:
+                s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorBlack).Background(tcell.ColorYellow))
+            default:
+                // syntax foreground coloring if present
+                if g := fgGroup[j]; g != "" {
+                    col, ok := theme[g]
+                    if !ok {
+                        col = tcell.ColorWhite
+                    }
+                    style := tcell.StyleDefault.Foreground(col)
+                    // make comments dimmer for subtlety
+                    if g == "comment" {
+                        style = style.Attributes(tcell.AttrDim)
+                    }
+                    if g == "function" {
+                        style = style.Attributes(tcell.AttrBold)
+                    }
+                    s.SetContent(j, i, ch, nil, style)
+                } else {
+                    s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
+                }
+            }
+        }
+        // if cursor at end of line, draw placeholder cell
+        if lineStartRune+len(runes) == cursor && len(runes) < width {
+            s.SetContent(len(runes), i, ' ', nil, cursorStyle)
 		}
 		// advance offsets by bytes/runes in line + 1 for the newline
 		lineStart += len([]byte(line)) + 1
