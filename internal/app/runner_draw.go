@@ -56,7 +56,7 @@ func drawHelp(s tcell.Screen) {
 		"- Ctrl+Z / Ctrl+Y: Undo / Redo",
 		"- Ctrl+A/Ctrl+E: Line start/end (insert)",
 		"- Modes: Normal (default), Insert (i), Visual (v)",
-		"- Normal mode: p paste, a append",
+		"- Normal mode: p paste, a append, dd delete line",
 		"- Visual mode: y copy, x cut, o open line",
 		"- Arrow keys or Ctrl+B/F/P/N: Move cursor",
 		"- Enter: New line; Backspace/Delete: Remove",

@@ -14,8 +14,12 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		if r.PendingG && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == 0) {
 			r.PendingG = false
 		}
+		if r.PendingD && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'd' && ev.Modifiers() == 0) {
+			r.PendingD = false
+		}
 	case ModeInsert:
 		r.PendingG = false
+		r.PendingD = false
 	}
 	// Mode transitions similar to Vim
 	if ev.Key() == tcell.KeyEsc {
@@ -90,6 +94,28 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Mode = ModeInsert
 			if r.Screen != nil {
 				r.draw(nil)
+			}
+			return false
+		case 'd':
+			if r.PendingD {
+				r.PendingD = false
+				if r.Buf != nil {
+					start, end := r.currentLineBounds()
+					if end > start {
+						text := string(r.Buf.Slice(start, end))
+						_ = r.deleteRange(start, end, text)
+						r.KillRing.Set(text)
+						r.recomputeCursorLine()
+						if r.Logger != nil {
+							r.Logger.Event("action", map[string]any{"name": "delete.line", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+						}
+						if r.Screen != nil {
+							r.draw(nil)
+						}
+					}
+				}
+			} else {
+				r.PendingD = true
 			}
 			return false
 		case 'G':
@@ -455,8 +481,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-	// Ctrl+U -> yank (paste) from kill ring
-	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'u' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlU {
+	// Ctrl+U -> yank (paste) from kill ring in insert mode
+	if r.Mode == ModeInsert && ((ev.Key() == tcell.KeyRune && ev.Rune() == 'u' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlU) {
 		if r.KillRing.HasData() {
 			text := r.KillRing.Get()
 			r.insertText(text)

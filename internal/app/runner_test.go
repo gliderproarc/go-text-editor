@@ -355,16 +355,33 @@ func TestVisualGotoTopAndBottom(t *testing.T) {
 
 func TestVisualHalfPageMovement(t *testing.T) {
 	text := strings.Repeat("x\n", 30)
-	r := &Runner{Buf: buffer.NewGapBufferFromString(text), Mode: ModeNormal}
+	r := &Runner{Buf: buffer.NewGapBufferFromString(text), Mode: ModeNormal, KillRing: history.KillRing{}}
+	orig := r.Buf.String()
 	r.recomputeCursorLine()
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'd', tcell.ModCtrl))
 	if r.CursorLine != 10 {
 		t.Fatalf("expected cursor line 10 after Ctrl+D, got %d", r.CursorLine)
 	}
+	r.KillRing.Set("ZZ")
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'u', tcell.ModCtrl))
 	if r.CursorLine != 0 {
 		t.Fatalf("expected cursor line 0 after Ctrl+U, got %d", r.CursorLine)
+	}
+	if got := r.Buf.String(); got != orig {
+		t.Fatalf("expected buffer unchanged after Ctrl+U, got %q", got)
+	}
+}
+
+func TestNormalDeleteLineDD(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("hello\nworld"), KillRing: history.KillRing{}}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'd', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'd', 0))
+	if got := r.Buf.String(); got != "world" {
+		t.Fatalf("expected buffer 'world', got %q", got)
+	}
+	if kr := r.KillRing.Get(); kr != "hello\n" {
+		t.Fatalf("expected kill ring to contain 'hello\\n', got %q", kr)
 	}
 }
 

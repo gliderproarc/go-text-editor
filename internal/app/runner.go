@@ -42,6 +42,7 @@ type Runner struct {
 	EventCh     chan tcell.Event
 	RenderCh    chan renderState
 	PendingG    bool
+	PendingD    bool
 }
 
 func (r *Runner) setMiniBuffer(lines []string) {
