@@ -8,7 +8,12 @@ import (
 // handleKeyEvent processes a key event. It returns true if the event signals
 // the runner should quit.
 func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
-	if r.Mode != ModeVisual {
+	switch r.Mode {
+	case ModeNormal:
+		if r.PendingG && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == 0) {
+			r.PendingG = false
+		}
+	case ModeInsert:
 		r.PendingG = false
 	}
 	// Mode transitions similar to Vim
@@ -21,6 +26,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		case ModeVisual:
 			r.Mode = ModeNormal
 			r.VisualStart = -1
+			r.PendingG = false
 			r.draw(nil)
 			return false
 		default:
@@ -71,6 +77,35 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.draw(nil)
 			}
 			return false
+		case 'G':
+			if r.Buf != nil {
+				lines := r.Buf.Lines()
+				last := len(lines) - 1
+				if last > 0 && len(lines[last]) == 0 {
+					last--
+				}
+				start, _ := r.Buf.LineAt(last)
+				r.Cursor = start
+				r.CursorLine = last
+			}
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		case 'g':
+			if r.PendingG {
+				r.PendingG = false
+				if r.Buf != nil {
+					r.Cursor = 0
+					r.CursorLine = 0
+				}
+				if r.Screen != nil {
+					r.draw(nil)
+				}
+			} else {
+				r.PendingG = true
+			}
+			return false
 		case '$':
 			if r.Buf != nil {
 				_, end := r.currentLineBounds()
@@ -102,6 +137,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	if r.Mode == ModeVisual && ev.Key() == tcell.KeyRune && ev.Rune() == 'v' && ev.Modifiers() == 0 {
 		r.Mode = ModeNormal
 		r.VisualStart = -1
+		r.PendingG = false
 		r.draw(nil)
 		return false
 	}
