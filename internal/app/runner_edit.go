@@ -9,14 +9,19 @@ func (r *Runner) visualSelectionBounds() (start, end int) {
 	if start > end {
 		start, end = end, start
 	}
-	if r.VisualLine && r.Buf != nil {
-		for start > 0 && r.Buf.RuneAt(start-1) != '\n' {
-			start--
-		}
-		for end < r.Buf.Len() && r.Buf.RuneAt(end) != '\n' {
-			end++
-		}
-		if end < r.Buf.Len() {
+	if r.Buf != nil {
+		if r.VisualLine {
+			for start > 0 && r.Buf.RuneAt(start-1) != '\n' {
+				start--
+			}
+			for end < r.Buf.Len() && r.Buf.RuneAt(end) != '\n' {
+				end++
+			}
+			if end < r.Buf.Len() {
+				end++
+			}
+		} else if end < r.Buf.Len() {
+			// Ensure the character under the cursor is included
 			end++
 		}
 	}
