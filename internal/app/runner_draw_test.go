@@ -1,12 +1,13 @@
 package app
 
 import (
-	"strings"
-	"testing"
+    "strings"
+    "testing"
 
-	"example.com/texteditor/pkg/buffer"
-	"example.com/texteditor/pkg/search"
-	"github.com/gdamore/tcell/v2"
+    "example.com/texteditor/pkg/buffer"
+    "example.com/texteditor/pkg/config"
+    "example.com/texteditor/pkg/search"
+    "github.com/gdamore/tcell/v2"
 )
 
 func TestDrawFile_Highlights(t *testing.T) {
@@ -22,8 +23,8 @@ func TestDrawFile_Highlights(t *testing.T) {
 	// compute highlights for "hello"
 	ranges := search.SearchAll(text, "hello")
 
-	// draw with highlights
-	drawFile(s, "f.txt", lines, ranges, -1, false, ModeInsert, 0, nil)
+    // draw with highlights
+    drawFile(s, "f.txt", lines, ranges, -1, false, ModeInsert, 0, nil, config.DefaultTheme())
 
 	// check first line "hello" at (0,0..4) is highlighted
 	for x := 0; x < 5; x++ {
@@ -58,7 +59,7 @@ func TestDrawBuffer_DirtyIndicator(t *testing.T) {
 	defer s.Fini()
 
 	buf := buffer.NewGapBufferFromString("hello")
-	drawBuffer(s, buf, "f.txt", nil, 0, true, ModeInsert, 0, nil)
+    drawBuffer(s, buf, "f.txt", nil, 0, true, ModeInsert, 0, nil, config.DefaultTheme())
 
 	_, height := s.Size()
 	expected := "f.txt [+] — Press Ctrl+Q to exit"
@@ -79,7 +80,7 @@ func TestDrawBuffer_MiniBuffer(t *testing.T) {
 
 	buf := buffer.NewGapBufferFromString("hello")
 	mini := []string{"mini", "buffer"}
-	drawBuffer(s, buf, "f.txt", nil, 0, false, ModeInsert, 0, mini)
+    drawBuffer(s, buf, "f.txt", nil, 0, false, ModeInsert, 0, mini, config.DefaultTheme())
 
 	_, height := s.Size()
 	for i, line := range mini {
@@ -101,7 +102,7 @@ func TestDrawFile_Viewport(t *testing.T) {
 	defer s.Fini()
 
 	lines := []string{"l1", "l2", "l3"}
-	drawFile(s, "f.txt", lines, nil, -1, false, ModeInsert, 1, nil)
+    drawFile(s, "f.txt", lines, nil, -1, false, ModeInsert, 1, nil, config.DefaultTheme())
 	cr, _, _, _ := s.GetContent(0, 0)
 	if cr != 'l' {
 		t.Fatalf("expected 'l' at (0,0) got %q", string(cr))

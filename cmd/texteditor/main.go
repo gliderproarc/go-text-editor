@@ -17,11 +17,12 @@ func main() {
 	// Initialize logger from env for CLI runs
 	r.Logger = logs.NewFromEnv()
 
-	if cfg, err := config.LoadDefault(); err != nil {
-		fmt.Fprintf(os.Stderr, "config error: %v\n", err)
-	} else {
-		r.Keymap = cfg.Keymap
-	}
+    if cfg, err := config.LoadDefault(); err != nil {
+        fmt.Fprintf(os.Stderr, "config error: %v\n", err)
+    } else {
+        r.Keymap = cfg.Keymap
+        r.Theme = cfg.Theme
+    }
 
 	// Load optional file path argument
 	if len(os.Args) > 1 {

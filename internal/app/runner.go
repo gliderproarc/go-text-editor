@@ -24,9 +24,9 @@ const (
 
 // Runner owns the terminal lifecycle and a minimal event loop.
 type Runner struct {
-	Screen      tcell.Screen
-	FilePath    string
-	Buf         *buffer.GapBuffer
+    Screen      tcell.Screen
+    FilePath    string
+    Buf         *buffer.GapBuffer
 	Cursor      int // cursor position in runes
 	CursorLine  int // 0-based current line index (maintained incrementally)
 	TopLine     int // first visible line index
@@ -39,10 +39,11 @@ type Runner struct {
 	History     *history.History
 	KillRing    history.KillRing
 	Logger      *logs.Logger
-	MiniBuf     []string
-	Keymap      map[string]config.Keybinding
-	EventCh     chan tcell.Event
-	RenderCh    chan renderState
+    MiniBuf     []string
+    Keymap      map[string]config.Keybinding
+    Theme       config.Theme
+    EventCh     chan tcell.Event
+    RenderCh    chan renderState
 	PendingG    bool
 	PendingD    bool
 	Syntax      plugins.Highlighter
@@ -73,10 +74,10 @@ func (r *Runner) waitEvent() tcell.Event {
 
 // New creates an empty Runner.
 func New() *Runner {
-	ed := editor.New()
-	bs := editor.BufferState{Buf: buffer.NewGapBuffer(0)}
-	ed.AddBuffer(bs)
-	return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Ed: ed}
+    ed := editor.New()
+    bs := editor.BufferState{Buf: buffer.NewGapBuffer(0)}
+    ed.AddBuffer(bs)
+    return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Theme: config.DefaultTheme(), Ed: ed}
 }
 
 // cursorLine returns the current 0-based line index of the cursor.

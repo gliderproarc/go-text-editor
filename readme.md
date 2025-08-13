@@ -332,7 +332,48 @@ Reference Plugin (for milestone M8)
 
 File: ~/.<project>/config.yaml (or local .editorconfig.yaml in project root)
 
-theme: "default"
+theme:
+  preset: "light" # or "dark"; or omit to use defaults
+  # Optional overrides (any of these keys)
+  # ui.background: black
+  # ui.foreground: white
+  # status.bg: white
+  # status.fg: black
+  # mini.bg: white
+  # mini.fg: black
+  # cursor.text: black
+  # cursor.insert.bg: blue
+  # cursor.normal.bg: green
+  # text.default: white
+  # highlight.search.bg: yellow
+  # highlight.search.fg: black
+  # highlight.search.current.bg: blue
+  # highlight.search.current.fg: white
+  # syntax.keyword: red
+  # syntax.string: green
+  # syntax.comment: gray
+  # syntax.number: yellow
+  # syntax.type: blue
+  # syntax.function: blue
+
+Using Base16 or Alacritty themes
+- Base16: point to any Base16 YAML (keys base00..base0F) and optionally override:
+  theme:
+    file: "/absolute/path/to/base16-scheme.yaml"
+    # overrides here are applied after import
+
+- Alacritty: reference your Alacritty colors file (YAML keys supported):
+  theme:
+    file: "/absolute/path/to/alacritty/colors.yml"
+
+Bundled examples
+- Base16 presets included under `config/themes/base16/`:
+  - `base16-default-dark.yaml`
+  - `base16-default-light.yaml`
+  - `base16-solarized-dark.yaml`
+  - `base16-gruvbox-dark.yaml`
+
+Relative `theme.file` paths are resolved against the directory of your config file.
 keymap:
   "Ctrl+Q": "editor.quit"
   "Ctrl+S": "file.save"
