@@ -71,6 +71,7 @@ Interactive example (typical session):
  - Move the cursor with the arrow keys (or Ctrl+B/F/P/N), PageUp/PageDown, Home/End.
 - Search (incremental): press Ctrl+W, type a query — matches are highlighted in the viewport as you type; press Enter to jump to the current match, Esc to cancel.
 - Go to line: press Alt+G, enter a 1-based line number, press Enter to jump.
+- Mnemonic menu: press Space in normal mode or Alt+M in insert mode to open a mnemonic key menu; press Space within this menu to switch to the everything menu.
 - Save changes: press Ctrl+S.
 - Quit: press Ctrl+Q (the editor will prompt if the buffer is dirty in future milestones).
 
