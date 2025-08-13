@@ -332,6 +332,42 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		return false
 	}
 
+	// Half-page down/up in normal mode (Ctrl+D / Ctrl+U)
+	if r.Mode != ModeInsert {
+		// Ctrl+D
+		if (ev.Key() == tcell.KeyRune && ev.Rune() == 'd' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlD {
+			lines := 10
+			if r.Screen != nil {
+				_, h := r.Screen.Size()
+				if h > 0 {
+					lines = h / 2
+				}
+			}
+			r.moveCursorVertical(lines)
+			r.recomputeCursorLine()
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		}
+		// Ctrl+U
+		if (ev.Key() == tcell.KeyRune && ev.Rune() == 'u' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlU {
+			lines := 10
+			if r.Screen != nil {
+				_, h := r.Screen.Size()
+				if h > 0 {
+					lines = h / 2
+				}
+			}
+			r.moveCursorVertical(-lines)
+			r.recomputeCursorLine()
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		}
+	}
+
 	if r.Mode == ModeVisual {
 		return r.handleVisualKey(ev)
 	}
