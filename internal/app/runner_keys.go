@@ -1,6 +1,7 @@
 package app
 
 import (
+	"example.com/texteditor/pkg/buffer"
 	"example.com/texteditor/pkg/config"
 	"github.com/gdamore/tcell/v2"
 )
@@ -100,6 +101,33 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 					last--
 				}
 				r.CursorLine = last
+			}
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		case 'w':
+			if r.Buf != nil {
+				r.Cursor = buffer.NextWordStart(r.Buf, r.Cursor)
+				r.recomputeCursorLine()
+			}
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		case 'b':
+			if r.Buf != nil {
+				r.Cursor = buffer.WordStart(r.Buf, r.Cursor)
+				r.recomputeCursorLine()
+			}
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		case 'e':
+			if r.Buf != nil {
+				r.Cursor = buffer.WordEnd(r.Buf, r.Cursor)
+				r.recomputeCursorLine()
 			}
 			if r.Screen != nil {
 				r.draw(nil)
@@ -514,6 +542,27 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 				r.CursorLine++
 			}
 			r.Cursor++
+		}
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyRune && ev.Rune() == 'w' && ev.Modifiers() == 0:
+		if r.Buf != nil {
+			r.Cursor = buffer.NextWordStart(r.Buf, r.Cursor)
+			r.recomputeCursorLine()
+		}
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyRune && ev.Rune() == 'b' && ev.Modifiers() == 0:
+		if r.Buf != nil {
+			r.Cursor = buffer.WordStart(r.Buf, r.Cursor)
+			r.recomputeCursorLine()
+		}
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyRune && ev.Rune() == 'e' && ev.Modifiers() == 0:
+		if r.Buf != nil {
+			r.Cursor = buffer.WordEnd(r.Buf, r.Cursor)
+			r.recomputeCursorLine()
 		}
 		r.draw(nil)
 		return false
