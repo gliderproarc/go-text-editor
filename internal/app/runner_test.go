@@ -359,14 +359,21 @@ func TestVisualHalfPageMovement(t *testing.T) {
 	orig := r.Buf.String()
 	r.recomputeCursorLine()
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'd', tcell.ModCtrl))
+	start := r.Cursor
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlD, 0, 0))
 	if r.CursorLine != 10 {
 		t.Fatalf("expected cursor line 10 after Ctrl+D, got %d", r.CursorLine)
 	}
+	if r.Mode != ModeVisual || r.VisualStart != start {
+		t.Fatalf("expected to remain in visual mode after Ctrl+D")
+	}
 	r.KillRing.Set("ZZ")
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'u', tcell.ModCtrl))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlU, 0, 0))
 	if r.CursorLine != 0 {
 		t.Fatalf("expected cursor line 0 after Ctrl+U, got %d", r.CursorLine)
+	}
+	if r.Mode != ModeVisual || r.VisualStart != start {
+		t.Fatalf("expected to remain in visual mode after Ctrl+U")
 	}
 	if got := r.Buf.String(); got != orig {
 		t.Fatalf("expected buffer unchanged after Ctrl+U, got %q", got)

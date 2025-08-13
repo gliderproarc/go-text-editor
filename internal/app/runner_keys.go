@@ -537,6 +537,7 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 			}
 		}
 		r.moveCursorVertical(lines)
+		r.recomputeCursorLine()
 		r.draw(nil)
 		return false
 	case (ev.Key() == tcell.KeyRune && ev.Rune() == 'u' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlU:
@@ -548,6 +549,7 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 			}
 		}
 		r.moveCursorVertical(-lines)
+		r.recomputeCursorLine()
 		r.draw(nil)
 		return false
 	case ev.Key() == tcell.KeyLeft || (ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == 0):
