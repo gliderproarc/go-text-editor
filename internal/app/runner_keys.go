@@ -8,6 +8,9 @@ import (
 // handleKeyEvent processes a key event. It returns true if the event signals
 // the runner should quit.
 func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
+	if r.Mode != ModeVisual {
+		r.PendingG = false
+	}
 	// Mode transitions similar to Vim
 	if ev.Key() == tcell.KeyEsc {
 		switch r.Mode {
@@ -394,7 +397,56 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 
 // handleVisualKey processes key events while in visual mode.
 func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
+	if r.PendingG && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == 0) {
+		r.PendingG = false
+	}
 	switch {
+	case r.PendingG && ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == 0:
+		r.PendingG = false
+		if r.Buf != nil {
+			r.Cursor = 0
+			r.CursorLine = 0
+		}
+		r.draw(nil)
+		return false
+	case ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == 0:
+		r.PendingG = true
+		return false
+	case ev.Key() == tcell.KeyRune && ev.Rune() == 'G':
+		if r.Buf != nil {
+			lines := r.Buf.Lines()
+			last := len(lines) - 1
+			if last > 0 && len(lines[last]) == 0 {
+				last--
+			}
+			start, _ := r.Buf.LineAt(last)
+			r.Cursor = start
+			r.CursorLine = last
+		}
+		r.draw(nil)
+		return false
+	case (ev.Key() == tcell.KeyRune && ev.Rune() == 'd' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlD:
+		lines := 10
+		if r.Screen != nil {
+			_, h := r.Screen.Size()
+			if h > 0 {
+				lines = h / 2
+			}
+		}
+		r.moveCursorVertical(lines)
+		r.draw(nil)
+		return false
+	case (ev.Key() == tcell.KeyRune && ev.Rune() == 'u' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlU:
+		lines := 10
+		if r.Screen != nil {
+			_, h := r.Screen.Size()
+			if h > 0 {
+				lines = h / 2
+			}
+		}
+		r.moveCursorVertical(-lines)
+		r.draw(nil)
+		return false
 	case ev.Key() == tcell.KeyLeft || (ev.Key() == tcell.KeyRune && ev.Rune() == 'h' && ev.Modifiers() == 0):
 		if r.Cursor > 0 {
 			if r.Buf != nil && r.Buf.RuneAt(r.Cursor-1) == '\n' {
