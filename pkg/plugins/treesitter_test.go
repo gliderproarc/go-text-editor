@@ -2,7 +2,10 @@
 
 package plugins
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 func TestTreeSitterParse(t *testing.T) {
 	ts := NewTreeSitterPlugin()
@@ -24,20 +27,27 @@ func TestManagerRegister(t *testing.T) {
 
 func TestTreeSitterHighlight(t *testing.T) {
 	ts := NewTreeSitterPlugin()
-	code := []byte("package main\nfunc main() {return}\n")
+	code := []byte("package main\nfunc main() {return \"hi\"}\n")
 	ranges := ts.Highlight(code)
 	if len(ranges) == 0 {
 		t.Fatalf("expected highlights, got none")
 	}
-	// ensure the \"func\" keyword is highlighted
-	found := false
+	funcOff := bytes.Index(code, []byte("func"))
+	strOff := bytes.Index(code, []byte("\"hi\""))
+	funcFound := false
+	strFound := false
 	for _, r := range ranges {
-		if r.Start == 13 { // byte offset of "func"
-			found = true
-			break
+		if r.Start == funcOff {
+			funcFound = true
+		}
+		if r.Start == strOff {
+			strFound = true
 		}
 	}
-	if !found {
+	if !funcFound {
 		t.Fatalf("expected func keyword to be highlighted")
+	}
+	if !strFound {
+		t.Fatalf("expected string literal to be highlighted")
 	}
 }

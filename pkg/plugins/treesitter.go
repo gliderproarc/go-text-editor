@@ -57,7 +57,7 @@ func (t *TreeSitterPlugin) Highlight(src []byte) []search.Range {
 		if _, ok := keywords[typ]; ok {
 			ranges = append(ranges, search.Range{Start: int(n.StartByte()), End: int(n.EndByte())})
 		}
-		if typ == "comment" {
+		if typ == "comment" || typ == "interpreted_string_literal" || typ == "raw_string_literal" {
 			ranges = append(ranges, search.Range{Start: int(n.StartByte()), End: int(n.EndByte())})
 		}
 		for i := 0; i < int(n.ChildCount()); i++ {
