@@ -8,6 +8,8 @@ import (
 	"example.com/texteditor/pkg/editor"
 	"example.com/texteditor/pkg/history"
 	"example.com/texteditor/pkg/logs"
+	"example.com/texteditor/pkg/plugins"
+	"example.com/texteditor/pkg/search"
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -43,6 +45,9 @@ type Runner struct {
 	RenderCh    chan renderState
 	PendingG    bool
 	PendingD    bool
+	Syntax      plugins.Highlighter
+	syntaxSrc   string
+	syntaxCache []search.Range
 }
 
 func (r *Runner) setMiniBuffer(lines []string) {
@@ -143,6 +148,7 @@ func (r *Runner) LoadFile(path string) error {
 	r.Buf = bs.Buf
 	r.Cursor = bs.Cursor
 	r.Dirty = bs.Dirty
+	r.syntaxSrc = ""
 	// Initialize CursorLine from cached lines
 	if r.Buf != nil {
 		lines := r.Buf.Lines()

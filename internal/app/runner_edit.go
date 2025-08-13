@@ -63,6 +63,7 @@ func (r *Runner) insertText(text string) {
 		}
 	}
 	r.Dirty = true
+	r.syntaxSrc = ""
 }
 
 // deleteRange deletes [start,end) with provided text for history and updates cursor.
@@ -104,6 +105,7 @@ func (r *Runner) deleteRange(start, end int, text string) error {
 		}
 	}
 	r.Dirty = true
+	r.syntaxSrc = ""
 	return nil
 }
 

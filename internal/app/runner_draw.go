@@ -111,6 +111,9 @@ func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
 	if vh := r.visualHighlightRange(); len(vh) > 0 {
 		highlights = append(highlights, vh...)
 	}
+	if sh := r.syntaxHighlights(); len(sh) > 0 {
+		highlights = append(highlights, sh...)
+	}
 	mini := append([]string(nil), r.MiniBuf...)
 	hs := append([]search.Range(nil), highlights...)
 	var lines []string
