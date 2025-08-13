@@ -1,3 +1,5 @@
+//go:build tree_sitter
+
 package plugins
 
 import "testing"
