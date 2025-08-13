@@ -13,10 +13,10 @@ func (r *Runner) syntaxHighlights() []search.Range {
 	if r.Buf == nil {
 		return nil
 	}
-	if r.syntaxCache != nil && r.syntaxSrc != "" {
+	src := r.Buf.String()
+	if r.syntaxCache != nil && r.syntaxSrc == src {
 		return r.syntaxCache
 	}
-	src := r.Buf.String()
 	if r.Syntax == nil {
 		r.Syntax = plugins.NewTreeSitterPlugin()
 	}
