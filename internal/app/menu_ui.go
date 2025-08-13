@@ -12,31 +12,33 @@ type command struct {
 }
 
 func (r *Runner) commandList() []command {
-	return []command{
-		{name: "open file", action: func() bool { r.runOpenPrompt(); return false }},
-		{name: "save", action: func() bool {
-			if r.FilePath == "" {
-				r.runSaveAsPrompt()
-			} else {
-				if err := r.Save(); err == nil {
-					r.showDialog("Saved " + r.FilePath)
-				}
-			}
-			if r.Logger != nil {
-				r.Logger.Event("action", map[string]any{"name": "save", "file": r.FilePath})
-			}
-			return false
-		}},
-		{name: "search", action: func() bool { r.runSearchPrompt(); return false }},
-		{name: "go to line", action: func() bool { r.runGoToPrompt(); return false }},
-		{name: "help", action: func() bool { r.ShowHelp = true; r.draw(nil); return false }},
-		{name: "quit", action: func() bool {
-			if r.Dirty {
-				return r.runQuitPrompt()
-			}
-			return true
-		}},
-	}
+    return []command{
+        {name: "open file", action: func() bool { r.runOpenPrompt(); return false }},
+        {name: "save", action: func() bool {
+            if r.FilePath == "" {
+                r.runSaveAsPrompt()
+            } else {
+                if err := r.Save(); err == nil {
+                    r.showDialog("Saved " + r.FilePath)
+                }
+            }
+            if r.Logger != nil {
+                r.Logger.Event("action", map[string]any{"name": "save", "file": r.FilePath})
+            }
+            return false
+        }},
+        {name: "theme: next", action: func() bool { r.NextTheme(); return false }},
+        {name: "theme: previous", action: func() bool { r.PrevTheme(); return false }},
+        {name: "search", action: func() bool { r.runSearchPrompt(); return false }},
+        {name: "go to line", action: func() bool { r.runGoToPrompt(); return false }},
+        {name: "help", action: func() bool { r.ShowHelp = true; r.draw(nil); return false }},
+        {name: "quit", action: func() bool {
+            if r.Dirty {
+                return r.runQuitPrompt()
+            }
+            return true
+        }},
+    }
 }
 
 // runCommandMenu opens a mini-buffer menu listing commands. It supports

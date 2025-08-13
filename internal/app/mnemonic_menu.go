@@ -14,40 +14,48 @@ type mnemonicNode struct {
 }
 
 func (r *Runner) mnemonicMenu() []*mnemonicNode {
-	return []*mnemonicNode{
-		{
-			key:  'f',
-			name: "file",
-			children: []*mnemonicNode{
-				{key: 'o', name: "open file", action: func() bool {
-					r.runOpenPrompt()
-					return false
-				}},
-				{key: 's', name: "save", action: func() bool {
-					if r.FilePath == "" {
-						r.runSaveAsPrompt()
-					} else {
-						if err := r.Save(); err == nil {
-							r.showDialog("Saved " + r.FilePath)
-						}
-					}
-					if r.Logger != nil {
-						r.Logger.Event("action", map[string]any{"name": "save", "file": r.FilePath})
-					}
-					return false
-				}},
-			},
-		},
-		{
-			key:  's',
-			name: "search",
-			children: []*mnemonicNode{
-				{key: 's', name: "search", action: func() bool {
-					r.runSearchPrompt()
-					return false
-				}},
-			},
-		},
+    return []*mnemonicNode{
+        {
+            key:  'f',
+            name: "file",
+            children: []*mnemonicNode{
+                {key: 'o', name: "open file", action: func() bool {
+                    r.runOpenPrompt()
+                    return false
+                }},
+                {key: 's', name: "save", action: func() bool {
+                    if r.FilePath == "" {
+                        r.runSaveAsPrompt()
+                    } else {
+                        if err := r.Save(); err == nil {
+                            r.showDialog("Saved " + r.FilePath)
+                        }
+                    }
+                    if r.Logger != nil {
+                        r.Logger.Event("action", map[string]any{"name": "save", "file": r.FilePath})
+                    }
+                    return false
+                }},
+            },
+        },
+        {
+            key:  't',
+            name: "theme",
+            children: []*mnemonicNode{
+                {key: 'n', name: "next", action: func() bool { r.NextTheme(); return false }},
+                {key: 'p', name: "previous", action: func() bool { r.PrevTheme(); return false }},
+            },
+        },
+        {
+            key:  's',
+            name: "search",
+            children: []*mnemonicNode{
+                {key: 's', name: "search", action: func() bool {
+                    r.runSearchPrompt()
+                    return false
+                }},
+            },
+        },
 		{
 			key:  'g',
 			name: "go to",

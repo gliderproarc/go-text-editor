@@ -156,15 +156,23 @@ func renderToScreen(s tcell.Screen, st renderState) {
 // If a render channel is configured, the snapshot is sent to the renderer
 // goroutine; otherwise it is drawn synchronously.
 func (r *Runner) draw(highlights []search.Range) {
-	if r.Screen == nil {
-		return
-	}
-	snapshot := r.renderSnapshot(highlights)
-	if r.RenderCh != nil {
-		r.RenderCh <- snapshot
-		return
-	}
-	renderToScreen(r.Screen, snapshot)
+    if r.Screen == nil {
+        return
+    }
+    snapshot := r.renderSnapshot(highlights)
+    if r.RenderCh != nil {
+        // Coalesce renders: drop any pending frame so the latest wins.
+        // This avoids showing stale intermediate frames (e.g., pre-theme/syntax)
+        // which can appear as brief color changes.
+        select {
+        case <-r.RenderCh:
+            // dropped an older pending frame
+        default:
+        }
+        r.RenderCh <- snapshot
+        return
+    }
+    renderToScreen(r.Screen, snapshot)
 }
 
 func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode, topLine int, minibuf []string, th config.Theme) {

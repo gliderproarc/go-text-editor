@@ -42,6 +42,8 @@ type Runner struct {
     MiniBuf     []string
     Keymap      map[string]config.Keybinding
     Theme       config.Theme
+    themeList   []themeEntry
+    themeIndex  int
     EventCh     chan tcell.Event
     RenderCh    chan renderState
 	PendingG    bool

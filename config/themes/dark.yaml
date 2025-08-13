@@ -1,0 +1,23 @@
+# Example theme: dark
+theme:
+  preset: dark
+  # Overrides welcome; e.g., brighter cursor or different status bar
+  # ui.background: black
+  # ui.foreground: white
+  # status.bg: gray
+  # status.fg: white
+  # cursor.text: black
+  # cursor.insert.bg: lightblue
+  # cursor.normal.bg: darkgreen
+  # text.default: white
+  # highlight.search.bg: darkolivegreen
+  # highlight.search.fg: white
+  # highlight.search.current.bg: blue
+  # highlight.search.current.fg: white
+  # syntax.keyword: red
+  # syntax.string: lightgreen
+  # syntax.comment: silver
+  # syntax.number: lightyellow
+  # syntax.type: lightblue
+  # syntax.function: lightcyan
+

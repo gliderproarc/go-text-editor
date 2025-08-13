@@ -1,0 +1,25 @@
+# Example theme: light (defaults)
+theme:
+  preset: light
+  # You can override any keys below
+  # ui.background: black
+  # ui.foreground: white
+  # status.bg: white
+  # status.fg: black
+  # mini.bg: white
+  # mini.fg: black
+  # cursor.text: black
+  # cursor.insert.bg: blue
+  # cursor.normal.bg: green
+  # text.default: white
+  # highlight.search.bg: yellow
+  # highlight.search.fg: black
+  # highlight.search.current.bg: blue
+  # highlight.search.current.fg: white
+  # syntax.keyword: red
+  # syntax.string: green
+  # syntax.comment: gray
+  # syntax.number: yellow
+  # syntax.type: blue
+  # syntax.function: blue
+
