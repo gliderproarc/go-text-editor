@@ -1,0 +1,17 @@
+{
+  "languages": [
+    {
+      "id": "go",
+      "name": "Go",
+      "extensions": [".go"],
+      "highlighter": "tree-sitter-go"
+    },
+    {
+      "id": "markdown",
+      "name": "Markdown",
+      "extensions": [".md", ".markdown"],
+      "highlighter": "markdown-basic"
+    }
+  ]
+}
+

@@ -78,31 +78,58 @@ Interactive example (typical session):
 Notes:
 - Search highlights and go-to behavior are implemented in M3. Highlight styles use a high-contrast background for visibility; theming and color configuration come later (M5).
 
-Tree-sitter Syntax Highlighting (Go)
------------------------------------
-This project ships optional tree-sitter-based highlighting for Go files.
+Language Support
+----------------
+Syntax highlighting is configured via a simple JSON file and supports both tree-sitter-backed and lightweight heuristic highlighters.
 
-- Build with tag: use the `tree_sitter` build tag to enable it.
-
-    go build -tags tree_sitter ./cmd/texteditor
-
-- Run tests with tag: to validate the integration and related tests:
-
-    go test -tags tree_sitter ./...
-
-- Local caching (CI/sandbox friendly): if your environment restricts writes outside the workspace, set Go cache dirs to local folders (already present in the repo):
+- Config file: `config/languages.json`
+- Defaults: Go (tree-sitter) and Markdown (basic heuristics)
+- Build tags:
+  - With tree-sitter providers: `go build -tags tree_sitter ./cmd/texteditor`
+  - Without tree-sitter: Markdown highlighting still works; other languages fall back to none.
+- Tests with tag: `go test -tags tree_sitter ./...`
+- CI/sandbox tip: force local Go caches if needed:
 
     GOCACHE=$(pwd)/.gocache GOMODCACHE=$(pwd)/.gomodcache GOTMPDIR=$(pwd)/.gotmp go test -tags tree_sitter ./...
 
-What it does now
-- Colors Go syntax groups: keywords, strings, comments, numbers, and function/type names.
-- Renders syntax as colored foreground; search results and visual selections stay as a yellow background overlay and take precedence.
-- Auto-enables only for `.go` files to avoid extra work on other filetypes.
-- Caches highlight ranges and invalidates on edit for responsiveness.
+Config format
 
-Planned next steps
-- Add theme configuration (per-group colors) and toggles.
-- Detect filetype via shebang/heuristics and support more languages.
+    {
+      "languages": [
+        { "id": "go", "name": "Go", "extensions": [".go"], "highlighter": "tree-sitter-go" },
+        { "id": "markdown", "name": "Markdown", "extensions": [".md", ".markdown"], "highlighter": "markdown-basic" }
+      ]
+    }
+
+How it works
+- The editor detects the language by the file’s extension using `config/languages.json` (falls back to built-in defaults if missing/invalid).
+- It instantiates the configured highlighter for that language and caches highlight ranges per source snapshot.
+- Highlight groups map to the theme in `internal/app/runner_draw.go`: `keyword`, `string`, `comment`, `number`, `function`, `type`.
+
+Current coverage
+- Go: keywords, strings, comments, numbers, and function/type names (via tree-sitter when built with `-tags tree_sitter`).
+- Markdown: headings, code fences and inline code, blockquotes, list markers, links, and emphasis (heuristic, always available).
+
+Add a new language
+1) Tree-sitter-backed
+- Add the corresponding Go binding (e.g., `github.com/smacker/go-tree-sitter/rust`).
+- Implement a highlighter plugin similar to `pkg/plugins/treesitter.go` for that grammar, or adapt it for the new language.
+- Register it in `pkg/plugins/language_provider_ts.go` by returning the new plugin for a unique `highlighter` id.
+- Add an entry in `config/languages.json` with the file extensions and that `highlighter` id.
+- Build with `-tags tree_sitter` to enable it.
+
+2) Heuristic/regex-backed
+- Create `pkg/plugins/<lang>.go` implementing:
+  - `type <Name>Highlighter struct{}`
+  - `func (h *<Name>Highlighter) Name() string`
+  - `func (h *<Name>Highlighter) Highlight(src []byte) []search.Range`
+- Add a case to `pkg/plugins/language_provider_notts.go` (and to the tree-sitter provider if you want it available in both builds) to return the new highlighter for a unique `highlighter` id.
+- Add the language entry to `config/languages.json` with its extensions and `highlighter` id.
+
+Notes
+- The config is read from `config/languages.json` relative to the working directory. If the file is missing or malformed, built-in defaults are used.
+- Markdown highlighter aligns with existing groups so theme colors apply automatically.
+- You can prototype a new language by only adding a heuristic highlighter; move to tree-sitter later for accuracy.
 
 ⸻
 
