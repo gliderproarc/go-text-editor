@@ -21,3 +21,23 @@ func TestManagerRegister(t *testing.T) {
 		t.Fatalf("tree-sitter plugin not registered")
 	}
 }
+
+func TestTreeSitterHighlight(t *testing.T) {
+	ts := NewTreeSitterPlugin()
+	code := []byte("package main\nfunc main() {return}\n")
+	ranges := ts.Highlight(code)
+	if len(ranges) == 0 {
+		t.Fatalf("expected highlights, got none")
+	}
+	// ensure the \"func\" keyword is highlighted
+	found := false
+	for _, r := range ranges {
+		if r.Start == 13 { // byte offset of "func"
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected func keyword to be highlighted")
+	}
+}
