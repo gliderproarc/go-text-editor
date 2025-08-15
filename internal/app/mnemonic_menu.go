@@ -1,9 +1,10 @@
 package app
 
 import (
-	"fmt"
+    "fmt"
+    "os"
 
-	"github.com/gdamore/tcell/v2"
+    "github.com/gdamore/tcell/v2"
 )
 
 type mnemonicNode struct {
@@ -36,6 +37,36 @@ func (r *Runner) mnemonicMenu() []*mnemonicNode {
                     }
                     return false
                 }},
+            },
+        },
+        {
+            key:  'p',
+            name: "spell",
+            children: []*mnemonicNode{
+                {key: 't', name: "toggle", action: func() bool {
+                    if r.Spell != nil && r.Spell.Enabled {
+                        r.DisableSpellCheck()
+                        r.showDialog("Spell checking disabled")
+                        return false
+                    }
+                    cmd := os.Getenv("TEXTEDITOR_SPELL")
+                    var err error
+                    if cmd != "" {
+                        err = r.EnableSpellCheck(cmd)
+                    } else {
+                        if err = r.EnableSpellCheck("./aspellbridge"); err != nil {
+                            err = r.EnableSpellCheck("./spellmock")
+                        }
+                    }
+                    if err != nil {
+                        r.showDialog("Spell enable failed: " + err.Error())
+                    } else {
+                        r.showDialog("Spell checking enabled")
+                    }
+                    return false
+                }},
+                {key: 'r', name: "recheck", action: func() bool { r.updateSpellAsync(); return false }},
+                {key: 'c', name: "check word", action: func() bool { r.CheckWordAtCursor(); return false }},
             },
         },
         {

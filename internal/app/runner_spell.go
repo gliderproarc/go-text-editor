@@ -1,6 +1,7 @@
 package app
 
 import (
+    "os"
     "regexp"
     "sort"
     "strings"
@@ -159,4 +160,101 @@ func (r *Runner) updateSpellAsync() {
         r.Spell.ranges = rs
         r.draw(nil)
     }(words, occs)
+}
+
+// ensureSpellClient ensures the spell client process is started without toggling
+// the background highlighting feature. It honors TEXTEDITOR_SPELL env, then
+// falls back to local helpers.
+func (r *Runner) ensureSpellClient() error {
+    if r.Spell == nil {
+        r.Spell = &SpellState{}
+    }
+    if r.Spell.Client != nil {
+        return nil
+    }
+    cmd := os.Getenv("TEXTEDITOR_SPELL")
+    var err error
+    r.Spell.Client = &spell.Client{}
+    if cmd != "" {
+        err = r.Spell.Client.Start(cmd)
+    } else {
+        // Try aspell bridge first; fall back to mock
+        if err = r.Spell.Client.Start("./aspellbridge"); err != nil {
+            err = r.Spell.Client.Start("./spellmock")
+        }
+    }
+    if err != nil {
+        r.Spell.Client = nil
+    }
+    return err
+}
+
+// CheckWordAtCursor checks the word under the cursor using the spell client
+// and displays a transient message in the mini-buffer. If the cursor is not on
+// a word, it shows "No word found".
+func (r *Runner) CheckWordAtCursor() string {
+    if r.Buf == nil || r.Buf.Len() == 0 {
+        return ""
+    }
+    text := r.Buf.String()
+    // Limit scan to current line for efficiency
+    lineStartRune, lineEndRune := r.currentLineBounds()
+    startByte := runeIndexToByteOffset(text, lineStartRune)
+    endByte := runeIndexToByteOffset(text, lineEndRune)
+    if startByte < 0 { startByte = 0 }
+    if endByte > len(text) { endByte = len(text) }
+    line := text[startByte:endByte]
+    curByte := runeIndexToByteOffset(text, r.Cursor)
+    rel := curByte - startByte
+    if rel < 0 { rel = 0 }
+    if rel > len(line) { rel = len(line) }
+
+    // Find the word span on this line that contains the cursor
+    var word string
+    locs := wordRE.FindAllStringIndex(line, -1)
+    for _, loc := range locs {
+        if rel >= loc[0] && rel < loc[1] { // cursor strictly inside the word span
+            word = strings.ToLower(line[loc[0]:loc[1]])
+            break
+        }
+    }
+    if word == "" {
+        r.setMiniBuffer([]string{"No word found"})
+        r.draw(nil)
+        r.clearMiniBuffer()
+        return "No word found"
+    }
+    // Ensure client running and check the single word
+    if err := r.ensureSpellClient(); err != nil || r.Spell == nil || r.Spell.Client == nil {
+        msg := "Spell check unavailable"
+        if err != nil { msg = msg + ": " + err.Error() }
+        r.setMiniBuffer([]string{msg})
+        r.draw(nil)
+        r.clearMiniBuffer()
+        return msg
+    }
+    bad, err := r.Spell.Client.Check([]string{word})
+    if err != nil {
+        msg := "Spell check failed: " + err.Error()
+        r.setMiniBuffer([]string{msg})
+        r.draw(nil)
+        r.clearMiniBuffer()
+        return msg
+    }
+    // Determine result
+    miss := false
+    for _, b := range bad {
+        if b == word {
+            miss = true
+            break
+        }
+    }
+    msg := "OK: " + word
+    if miss {
+        msg = "Misspelled: " + word
+    }
+    r.setMiniBuffer([]string{msg})
+    r.draw(nil)
+    r.clearMiniBuffer()
+    return msg
 }

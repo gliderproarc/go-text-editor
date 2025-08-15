@@ -52,6 +52,7 @@ func (r *Runner) commandList() []command {
             return false
         }},
         {name: "spell: recheck", action: func() bool { r.updateSpellAsync(); return false }},
+        {name: "spell: check word", action: func() bool { r.CheckWordAtCursor(); return false }},
         {name: "theme: next", action: func() bool { r.NextTheme(); return false }},
         {name: "theme: previous", action: func() bool { r.PrevTheme(); return false }},
         {name: "search", action: func() bool { r.runSearchPrompt(); return false }},
