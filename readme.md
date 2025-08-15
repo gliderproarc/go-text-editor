@@ -136,9 +136,16 @@ Spell Checking (IPC Prototype)
 - The editor can pipe whitespace-separated words to an external spell checker process and highlight words that need checking in the viewport.
 - Protocol: one request line contains space-separated words; one response line contains the subset of words to highlight (also space-separated). Words are treated case-insensitively.
 - Toggle via command menu: open the command palette (Space in normal mode or Alt+M in insert), search for "spell: toggle".
-  - By default it looks for `./spellmock` in the working directory. You can override with `TEXTEDITOR_SPELL=/path/to/spellchecker`.
+  - Default: uses `./aspellbridge` which wraps `aspell -a`. If `aspellbridge` fails, it falls back to `./spellmock`.
+  - Override with environment: set `TEXTEDITOR_SPELL=/path/to/custom-checker` to force a specific command.
 - Recheck the viewport at any time with the command "spell: recheck"; otherwise, checks trigger when the viewport changes.
 - Highlight color is configurable in the theme as `highlight.spell.bg` and `highlight.spell.fg`.
+
+aspell bridge
+
+- Build: `go build -o aspellbridge ./cmd/aspellbridge`
+- Requires `aspell` to be installed and on `PATH`.
+- Language can be set with `TEXTEDITOR_SPELL_LANG` (e.g., `en_US`); defaults to aspell's default language if unset.
 
 Mock checker for local testing
 - Build the mock: `go build -o spellmock ./cmd/spellmock`

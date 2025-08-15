@@ -24,6 +24,8 @@ type SpellState struct {
     lastTopLine int
     lastMaxLines int
     running     atomic.Bool
+    // lastEditSeq is the Runner.editSeq value the last time we scanned.
+    lastEditSeq int64
 }
 
 // EnableSpellCheck starts the external checker process. If already started,
@@ -86,7 +88,8 @@ func (r *Runner) updateSpellAsync() {
         maxLines = 0
     }
     // Avoid re-scanning if viewport unchanged.
-    if r.Spell.lastTopLine == r.TopLine && r.Spell.lastMaxLines == maxLines && len(r.Spell.ranges) > 0 {
+    // Coalesce when viewport unchanged AND content unchanged.
+    if r.Spell.lastTopLine == r.TopLine && r.Spell.lastMaxLines == maxLines && r.Spell.lastEditSeq == r.editSeq && len(r.Spell.ranges) > 0 {
         return
     }
     lines := r.Buf.Lines()
@@ -122,6 +125,7 @@ func (r *Runner) updateSpellAsync() {
     r.Spell.running.Store(true)
     r.Spell.lastTopLine = r.TopLine
     r.Spell.lastMaxLines = maxLines
+    r.Spell.lastEditSeq = r.editSeq
     // Prepare ordered word list for stable behavior.
     words := make([]string, 0, len(wordSet))
     for w := range wordSet {
@@ -156,4 +160,3 @@ func (r *Runner) updateSpellAsync() {
         r.draw(nil)
     }(words, occs)
 }
-

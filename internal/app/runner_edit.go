@@ -63,8 +63,10 @@ func (r *Runner) insertText(text string) {
 			r.CursorLine++
 		}
 	}
-	r.Dirty = true
-	r.syntaxSrc = ""
+    r.Dirty = true
+    r.syntaxSrc = ""
+    // Mark buffer content changed for spell re-check coalescing
+    r.editSeq++
 }
 
 // deleteRange deletes [start,end) with provided text for history and updates cursor.
@@ -105,9 +107,11 @@ func (r *Runner) deleteRange(start, end int, text string) error {
 			r.CursorLine = 0
 		}
 	}
-	r.Dirty = true
-	r.syntaxSrc = ""
-	return nil
+    r.Dirty = true
+    r.syntaxSrc = ""
+    // Mark buffer content changed for spell re-check coalescing
+    r.editSeq++
+    return nil
 }
 
 // moveCursorVertical moves the cursor up or down by delta lines, preserving the column when possible.

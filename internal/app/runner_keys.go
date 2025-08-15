@@ -273,10 +273,13 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	}
 	// Ctrl+Z -> undo (handle both rune+Ctrl and dedicated control key)
 	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'z' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlZ {
-		if r.History != nil {
-			_ = r.History.Undo(r.Buf, &r.Cursor)
-			r.recomputeCursorLine()
-			r.Dirty = true
+        if r.History != nil {
+            if err := r.History.Undo(r.Buf, &r.Cursor); err == nil {
+                // Buffer mutated via undo
+                r.editSeq++
+            }
+            r.recomputeCursorLine()
+            r.Dirty = true
 			if r.Logger != nil {
 				r.Logger.Event("action", map[string]any{"name": "undo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
@@ -299,10 +302,13 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 					r.draw(nil)
 				}
 			}
-		} else if r.History != nil {
-			_ = r.History.Redo(r.Buf, &r.Cursor)
-			r.recomputeCursorLine()
-			r.Dirty = true
+        } else if r.History != nil {
+            if err := r.History.Redo(r.Buf, &r.Cursor); err == nil {
+                // Buffer mutated via redo
+                r.editSeq++
+            }
+            r.recomputeCursorLine()
+            r.Dirty = true
 			if r.Logger != nil {
 				r.Logger.Event("action", map[string]any{"name": "redo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}

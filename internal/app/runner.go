@@ -65,6 +65,8 @@ type Runner struct {
     Overlay     Overlay
     // Spell checking subsystem state
     Spell       *SpellState
+    // Monotonic edit sequence; increments on any buffer mutation (insert/delete/undo/redo).
+    editSeq     int64
 }
 
 func (r *Runner) setMiniBuffer(lines []string) {

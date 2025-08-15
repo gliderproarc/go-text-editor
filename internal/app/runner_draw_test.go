@@ -24,7 +24,7 @@ func TestDrawFile_Highlights(t *testing.T) {
 	ranges := search.SearchAll(text, "hello")
 
     // draw with highlights
-    drawFile(s, "f.txt", lines, ranges, -1, false, ModeInsert, 0, nil, config.DefaultTheme())
+    drawFile(s, "f.txt", lines, ranges, -1, false, ModeInsert, OverlayNone, 0, nil, config.DefaultTheme())
 
 	// check first line "hello" at (0,0..4) is highlighted
 	for x := 0; x < 5; x++ {
@@ -59,10 +59,10 @@ func TestDrawBuffer_DirtyIndicator(t *testing.T) {
 	defer s.Fini()
 
 	buf := buffer.NewGapBufferFromString("hello")
-    drawBuffer(s, buf, "f.txt", nil, 0, true, ModeInsert, 0, nil, config.DefaultTheme())
+    drawBuffer(s, buf, "f.txt", nil, 0, true, ModeInsert, OverlayNone, 0, nil, config.DefaultTheme())
 
 	_, height := s.Size()
-	expected := "f.txt [+] — Press Ctrl+Q to exit"
+	expected := "<I>  f.txt [+] — Press Ctrl+Q to exit"
 	for i, r := range expected {
 		cr, _, _, _ := s.GetContent(i, height-1)
 		if cr != r {
@@ -80,7 +80,7 @@ func TestDrawBuffer_MiniBuffer(t *testing.T) {
 
 	buf := buffer.NewGapBufferFromString("hello")
 	mini := []string{"mini", "buffer"}
-    drawBuffer(s, buf, "f.txt", nil, 0, false, ModeInsert, 0, mini, config.DefaultTheme())
+    drawBuffer(s, buf, "f.txt", nil, 0, false, ModeInsert, OverlayNone, 0, mini, config.DefaultTheme())
 
 	_, height := s.Size()
 	for i, line := range mini {
@@ -102,7 +102,7 @@ func TestDrawFile_Viewport(t *testing.T) {
 	defer s.Fini()
 
 	lines := []string{"l1", "l2", "l3"}
-    drawFile(s, "f.txt", lines, nil, -1, false, ModeInsert, 1, nil, config.DefaultTheme())
+    drawFile(s, "f.txt", lines, nil, -1, false, ModeInsert, OverlayNone, 1, nil, config.DefaultTheme())
 	cr, _, _, _ := s.GetContent(0, 0)
 	if cr != 'l' {
 		t.Fatalf("expected 'l' at (0,0) got %q", string(cr))

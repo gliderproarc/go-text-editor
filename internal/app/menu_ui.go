@@ -35,8 +35,16 @@ func (r *Runner) commandList() []command {
                 return false
             }
             cmd := os.Getenv("TEXTEDITOR_SPELL")
-            if cmd == "" { cmd = "./spellmock" }
-            if err := r.EnableSpellCheck(cmd); err != nil {
+            var err error
+            if cmd != "" {
+                err = r.EnableSpellCheck(cmd)
+            } else {
+                // Default to aspell bridge; fall back to mock if unavailable
+                if err = r.EnableSpellCheck("./aspellbridge"); err != nil {
+                    err = r.EnableSpellCheck("./spellmock")
+                }
+            }
+            if err != nil {
                 r.showDialog("Spell enable failed: " + err.Error())
             } else {
                 r.showDialog("Spell checking enabled")
