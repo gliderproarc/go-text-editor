@@ -1,9 +1,10 @@
 package app
 
 import (
-	"strings"
+    "os"
+    "strings"
 
-	"github.com/gdamore/tcell/v2"
+    "github.com/gdamore/tcell/v2"
 )
 
 type command struct {
@@ -27,6 +28,22 @@ func (r *Runner) commandList() []command {
             }
             return false
         }},
+        {name: "spell: toggle", action: func() bool {
+            if r.Spell != nil && r.Spell.Enabled {
+                r.DisableSpellCheck()
+                r.showDialog("Spell checking disabled")
+                return false
+            }
+            cmd := os.Getenv("TEXTEDITOR_SPELL")
+            if cmd == "" { cmd = "./spellmock" }
+            if err := r.EnableSpellCheck(cmd); err != nil {
+                r.showDialog("Spell enable failed: " + err.Error())
+            } else {
+                r.showDialog("Spell checking enabled")
+            }
+            return false
+        }},
+        {name: "spell: recheck", action: func() bool { r.updateSpellAsync(); return false }},
         {name: "theme: next", action: func() bool { r.NextTheme(); return false }},
         {name: "theme: previous", action: func() bool { r.PrevTheme(); return false }},
         {name: "search", action: func() bool { r.runSearchPrompt(); return false }},

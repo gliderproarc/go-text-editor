@@ -139,6 +139,10 @@ func Load(path string) (*Config, error) {
                 cfg.Theme.HighlightSearchCurrentBG = ParseColor(v, cfg.Theme.HighlightSearchCurrentBG)
             case "highlight.search.current.fg":
                 cfg.Theme.HighlightSearchCurrentFG = ParseColor(v, cfg.Theme.HighlightSearchCurrentFG)
+            case "highlight.spell.bg":
+                cfg.Theme.HighlightSpellBG = ParseColor(v, cfg.Theme.HighlightSpellBG)
+            case "highlight.spell.fg":
+                cfg.Theme.HighlightSpellFG = ParseColor(v, cfg.Theme.HighlightSpellFG)
             default:
                 if strings.HasPrefix(strings.ToLower(k), "syntax.") {
                     group := strings.TrimPrefix(strings.ToLower(k), "syntax.")

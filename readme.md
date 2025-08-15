@@ -131,6 +131,19 @@ Notes
 - Markdown highlighter aligns with existing groups so theme colors apply automatically.
 - You can prototype a new language by only adding a heuristic highlighter; move to tree-sitter later for accuracy.
 
+Spell Checking (IPC Prototype)
+------------------------------
+- The editor can pipe whitespace-separated words to an external spell checker process and highlight words that need checking in the viewport.
+- Protocol: one request line contains space-separated words; one response line contains the subset of words to highlight (also space-separated). Words are treated case-insensitively.
+- Toggle via command menu: open the command palette (Space in normal mode or Alt+M in insert), search for "spell: toggle".
+  - By default it looks for `./spellmock` in the working directory. You can override with `TEXTEDITOR_SPELL=/path/to/spellchecker`.
+- Recheck the viewport at any time with the command "spell: recheck"; otherwise, checks trigger when the viewport changes.
+- Highlight color is configurable in the theme as `highlight.spell.bg` and `highlight.spell.fg`.
+
+Mock checker for local testing
+- Build the mock: `go build -o spellmock ./cmd/spellmock`
+- It flags words containing digits, ALL-CAPS (>=3 letters), or very long words (>14 letters) to demonstrate the integration.
+
 ⸻
 
 1) Project Phases & Milestones

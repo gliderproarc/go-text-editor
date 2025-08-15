@@ -38,6 +38,10 @@ type Theme struct {
     HighlightSearchCurrentBG tcell.Color
     HighlightSearchCurrentFG tcell.Color
 
+    // Spell check highlights (background)
+    HighlightSpellBG tcell.Color
+    HighlightSpellFG tcell.Color
+
     // Syntax groups (keyword, string, comment, number, type, function, ...)
     SyntaxColors map[string]tcell.Color
 }
@@ -70,6 +74,10 @@ func DefaultTheme() Theme {
         HighlightSearchFG:        tcell.ColorBlack,
         HighlightSearchCurrentBG: tcell.ColorBlue,
         HighlightSearchCurrentFG: tcell.ColorWhite,
+
+        // Spell check highlight: use magenta background with readable fg
+        HighlightSpellBG: tcell.ColorFuchsia,
+        HighlightSpellFG: tcell.ColorWhite,
 
         SyntaxColors: map[string]tcell.Color{
             "keyword":  tcell.ColorRed,
@@ -120,6 +128,10 @@ func TerminalTheme() Theme {
         HighlightSearchCurrentBG: tcell.ColorBlue,
         HighlightSearchCurrentFG: tcell.ColorDefault,
 
+        // Spell check highlight: use palette magenta and default fg
+        HighlightSpellBG: tcell.ColorFuchsia,
+        HighlightSpellFG: tcell.ColorDefault,
+
         // Syntax groups mapped to ANSI palette; actual shades come from terminal
         SyntaxColors: map[string]tcell.Color{
             "keyword":  tcell.ColorRed,
@@ -163,6 +175,9 @@ var BuiltinThemes = map[string]Theme{
         HighlightSearchFG:        tcell.ColorWhite,
         HighlightSearchCurrentBG: tcell.ColorBlue,
         HighlightSearchCurrentFG: tcell.ColorWhite,
+
+        HighlightSpellBG: tcell.ColorFuchsia,
+        HighlightSpellFG: tcell.ColorWhite,
 
         SyntaxColors: map[string]tcell.Color{
             "keyword":  tcell.ColorRed,

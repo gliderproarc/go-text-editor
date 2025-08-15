@@ -63,6 +63,8 @@ type Runner struct {
     syntaxCache []search.Range
     // current transient overlay (search/menu) to inform status bar
     Overlay     Overlay
+    // Spell checking subsystem state
+    Spell       *SpellState
 }
 
 func (r *Runner) setMiniBuffer(lines []string) {

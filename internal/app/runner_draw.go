@@ -110,13 +110,18 @@ func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights 
 
 // renderSnapshot captures the current runner state into a renderState.
 func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
-	r.ensureCursorVisible()
-	if vh := r.visualHighlightRange(); len(vh) > 0 {
-		highlights = append(highlights, vh...)
-	}
-	if sh := r.syntaxHighlights(); len(sh) > 0 {
-		highlights = append(highlights, sh...)
-	}
+    r.ensureCursorVisible()
+    // kick spellcheck update based on current viewport (non-blocking)
+    r.updateSpellAsync()
+    if vh := r.visualHighlightRange(); len(vh) > 0 {
+        highlights = append(highlights, vh...)
+    }
+    if sh := r.syntaxHighlights(); len(sh) > 0 {
+        highlights = append(highlights, sh...)
+    }
+    if sp := r.spellHighlights(); len(sp) > 0 {
+        highlights = append(highlights, sp...)
+    }
 	mini := append([]string(nil), r.MiniBuf...)
 	hs := append([]search.Range(nil), highlights...)
 	var lines []string
@@ -279,6 +284,10 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
                     // Subtle visual selection highlight
                     bg = th.SelectBG
                     fg = th.SelectFG
+                } else if g := bgGroup[j]; g == "bg.spell" {
+                    // Spell-check background highlight
+                    bg = th.HighlightSpellBG
+                    fg = th.HighlightSpellFG
                 }
                 s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(fg).Background(bg))
             default:
