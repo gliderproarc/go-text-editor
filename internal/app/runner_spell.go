@@ -1,11 +1,18 @@
 package app
 
 import (
+    "bufio"
+    "context"
+    "errors"
+    "io"
     "os"
+    "os/exec"
     "regexp"
     "sort"
+    "strconv"
     "strings"
     "sync/atomic"
+    "time"
 
     "example.com/texteditor/pkg/search"
     "example.com/texteditor/pkg/spell"
@@ -224,18 +231,14 @@ func (r *Runner) CheckWordAtCursor() string {
         r.clearMiniBuffer()
         return "No word found"
     }
-    // Ensure client running and check the single word
-    if err := r.ensureSpellClient(); err != nil || r.Spell == nil || r.Spell.Client == nil {
-        msg := "Spell check unavailable"
-        if err != nil { msg = msg + ": " + err.Error() }
-        r.setMiniBuffer([]string{msg})
-        r.draw(nil)
-        r.clearMiniBuffer()
-        return msg
-    }
-    bad, err := r.Spell.Client.Check([]string{word})
+    // Perform a single-word check with a timeout to avoid freezing the UI.
+    timeout := spellTimeout()
+    bad, err := r.checkWordsOnceWithTimeout([]string{word}, timeout)
     if err != nil {
         msg := "Spell check failed: " + err.Error()
+        if errorsIsDeadline(err) {
+            msg = "Spell check timed out"
+        }
         r.setMiniBuffer([]string{msg})
         r.draw(nil)
         r.clearMiniBuffer()
@@ -257,4 +260,77 @@ func (r *Runner) CheckWordAtCursor() string {
     r.draw(nil)
     r.clearMiniBuffer()
     return msg
+}
+
+// errorsIsDeadline reports whether the error indicates a context deadline.
+func errorsIsDeadline(err error) bool {
+    if err == nil { return false }
+    if errors.Is(err, context.DeadlineExceeded) { return true }
+    // Fallback substring check to be safe across exec errors
+    return strings.Contains(strings.ToLower(err.Error()), "deadline exceeded")
+}
+
+// spellTimeout reads a timeout from TEXTEDITOR_SPELL_TIMEOUT_MS, defaulting to 500ms.
+func spellTimeout() time.Duration {
+    const def = 500 * time.Millisecond
+    v := os.Getenv("TEXTEDITOR_SPELL_TIMEOUT_MS")
+    if v == "" { return def }
+    n, err := strconv.Atoi(v)
+    if err != nil || n <= 0 { return def }
+    return time.Duration(n) * time.Millisecond
+}
+
+// checkWordsOnceWithTimeout runs a one-shot spell check command with a timeout.
+// It uses TEXTEDITOR_SPELL if set, otherwise falls back to local helpers.
+func (r *Runner) checkWordsOnceWithTimeout(words []string, timeout time.Duration) ([]string, error) {
+    cmdPath := os.Getenv("TEXTEDITOR_SPELL")
+    if cmdPath == "" {
+        // Prefer aspell bridge; fall back to mock
+        if _, err := os.Stat("./aspellbridge"); err == nil {
+            cmdPath = "./aspellbridge"
+        } else {
+            cmdPath = "./spellmock"
+        }
+    }
+    cmd := exec.Command(cmdPath)
+    stdin, err := cmd.StdinPipe()
+    if err != nil { return nil, err }
+    stdout, err := cmd.StdoutPipe()
+    if err != nil { _ = stdin.Close(); return nil, err }
+    if err := cmd.Start(); err != nil { _ = stdin.Close(); return nil, err }
+
+    // Write request line
+    if _, err := io.WriteString(stdin, strings.Join(words, " ")+"\n"); err != nil {
+        _ = stdin.Close()
+        _ = cmd.Wait()
+        return nil, err
+    }
+    _ = stdin.Close()
+
+    type result struct{ bad []string; err error }
+    resCh := make(chan result, 1)
+    go func() {
+        br := bufio.NewReader(stdout)
+        line, err := br.ReadString('\n')
+        _ = cmd.Wait()
+        if err != nil {
+            resCh <- result{nil, err}
+            return
+        }
+        line = strings.TrimSpace(line)
+        if line == "" { resCh <- result{nil, nil}; return }
+        parts := strings.Fields(line)
+        for i := range parts { parts[i] = strings.ToLower(parts[i]) }
+        resCh <- result{parts, nil}
+    }()
+
+    select {
+    case r := <-resCh:
+        return r.bad, r.err
+    case <-time.After(timeout):
+        _ = cmd.Process.Kill()
+        // Ensure process is reaped
+        go cmd.Wait()
+        return nil, context.DeadlineExceeded
+    }
 }

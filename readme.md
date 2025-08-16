@@ -141,6 +141,10 @@ Spell Checking (IPC Prototype)
 - Recheck the viewport at any time with the command "spell: recheck"; otherwise, checks trigger when the viewport changes.
 - Highlight color is configurable in the theme as `highlight.spell.bg` and `highlight.spell.fg`.
 
+Note on async behavior
+- The "spell: check word" (word-at-point) command now runs a one-shot check with a short timeout so it won’t block the UI if the external checker stalls. Configure the timeout via `TEXTEDITOR_SPELL_TIMEOUT_MS` (default: 500ms).
+- We plan to migrate additional spell-check operations (e.g., viewport highlighting) to be fully async/timeout-aware as well. For now, we’re leaving them as-is until we’ve manually verified the word-at-point command works as expected in your environment.
+
 aspell bridge
 
 - Build: `go build -o aspellbridge ./cmd/aspellbridge`
