@@ -103,7 +103,8 @@ Config format
 
 How it works
 - The editor detects the language by the file’s extension using `config/languages.json` (falls back to built-in defaults if missing/invalid).
-- It instantiates the configured highlighter for that language and caches highlight ranges per source snapshot.
+- It instantiates the configured highlighter for that language.
+- Syntax highlighting runs asynchronously in a background worker on the latest buffer snapshot; results are applied on the next frame if still current (coalesced by edit sequence).
 - Highlight groups map to the theme in `internal/app/runner_draw.go`: `keyword`, `string`, `comment`, `number`, `function`, `type`.
 
 Current coverage
@@ -129,6 +130,10 @@ Add a new language
 Notes
 - The config is read from `config/languages.json` relative to the working directory. If the file is missing or malformed, built-in defaults are used.
 - Markdown highlighter aligns with existing groups so theme colors apply automatically.
+- Since syntax computation is async, extremely large files may show base UI first and then highlights pop in shortly after.
+
+Timeouts
+- `TEXTEDITOR_SYNTAX_TIMEOUT_MS` is reserved for future cancellation support. Currently syntax computation is async but not cancelable; slow results are safely dropped if the buffer changes before they finish.
 - You can prototype a new language by only adding a heuristic highlighter; move to tree-sitter later for accuracy.
 
 Spell Checking (IPC Prototype)
@@ -142,8 +147,8 @@ Spell Checking (IPC Prototype)
 - Highlight color is configurable in the theme as `highlight.spell.bg` and `highlight.spell.fg`.
 
 Note on async behavior
-- The "spell: check word" (word-at-point) command now runs a one-shot check with a short timeout so it won’t block the UI if the external checker stalls. Configure the timeout via `TEXTEDITOR_SPELL_TIMEOUT_MS` (default: 500ms).
-- We plan to migrate additional spell-check operations (e.g., viewport highlighting) to be fully async/timeout-aware as well. For now, we’re leaving them as-is until we’ve manually verified the word-at-point command works as expected in your environment.
+- The "spell: check word" (word-at-point) command runs a one-shot check with a short timeout so it won’t block the UI if the external checker stalls. Configure the timeout via `TEXTEDITOR_SPELL_TIMEOUT_MS` (default: 500ms).
+- Viewport spell checking (background highlighting) now also uses a timeout-aware request to the persistent spell client. If the checker stalls beyond the timeout, the client is terminated and will be restarted on demand; the UI remains responsive and simply clears spell highlights for that frame.
 
 aspell bridge
 

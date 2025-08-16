@@ -61,6 +61,8 @@ type Runner struct {
     Syntax      plugins.Highlighter
     syntaxSrc   string
     syntaxCache []search.Range
+    // Async syntax highlighting state
+    SyntaxAsync *SyntaxState
     // current transient overlay (search/menu) to inform status bar
     Overlay     Overlay
     // Spell checking subsystem state

@@ -141,11 +141,17 @@ func (r *Runner) updateSpellAsync() {
     }
     sort.Strings(words)
     go func(words []string, occs map[string][]occ) {
-        bad, err := r.Spell.Client.Check(words)
+        // Use a timeout to avoid hanging the background worker on a stuck checker.
+        bad, err := r.Spell.Client.CheckWithTimeout(words, spellTimeout())
         // Always clear running flag when done
         r.Spell.running.Store(false)
         if err != nil {
             // On error, clear spell ranges but do not spam UI.
+            // If the client timed out or failed, reset it so the next call can restart.
+            if r.Spell != nil && r.Spell.Client != nil {
+                r.Spell.Client.Stop()
+                r.Spell.Client = nil
+            }
             r.Spell.ranges = nil
             r.draw(nil)
             return

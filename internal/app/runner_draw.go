@@ -111,12 +111,13 @@ func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights 
 // renderSnapshot captures the current runner state into a renderState.
 func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
     r.ensureCursorVisible()
-    // kick spellcheck update based on current viewport (non-blocking)
+    // kick background updates based on current viewport/content (non-blocking)
     r.updateSpellAsync()
+    r.updateSyntaxAsync()
     if vh := r.visualHighlightRange(); len(vh) > 0 {
         highlights = append(highlights, vh...)
     }
-    if sh := r.syntaxHighlights(); len(sh) > 0 {
+    if sh := r.syntaxHighlightsCached(); len(sh) > 0 {
         highlights = append(highlights, sh...)
     }
     if sp := r.spellHighlights(); len(sp) > 0 {

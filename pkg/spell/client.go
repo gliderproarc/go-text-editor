@@ -2,11 +2,13 @@ package spell
 
 import (
     "bufio"
+    "context"
     "errors"
     "io"
     "os/exec"
     "strings"
     "sync"
+    "time"
 )
 
 // Client manages a long-lived external spell checking process communicating
@@ -102,3 +104,61 @@ func (c *Client) Check(words []string) ([]string, error) {
     return parts, nil
 }
 
+// CheckWithTimeout behaves like Check but aborts if no response is received
+// within the provided timeout. On timeout, the underlying process is killed
+// to unblock any pending read, and context.DeadlineExceeded is returned.
+func (c *Client) CheckWithTimeout(words []string, timeout time.Duration) ([]string, error) {
+    type result struct {
+        bad []string
+        err error
+    }
+    done := make(chan result, 1)
+
+    c.mu.Lock()
+    if c.cmd == nil || c.in == nil || c.out == nil {
+        c.mu.Unlock()
+        return nil, errors.New("spell client is not started")
+    }
+    cmd := c.cmd
+    in := c.in
+    out := c.out
+
+    go func() {
+        // Perform I/O without touching struct fields; unlock when finished.
+        line := strings.Join(words, " ") + "\n"
+        if _, err := io.WriteString(in, line); err != nil {
+            done <- result{nil, err}
+            c.mu.Unlock()
+            return
+        }
+        resp, err := out.ReadString('\n')
+        if err != nil {
+            done <- result{nil, err}
+            c.mu.Unlock()
+            return
+        }
+        resp = strings.TrimSpace(resp)
+        if resp == "" {
+            done <- result{nil, nil}
+            c.mu.Unlock()
+            return
+        }
+        parts := strings.Fields(resp)
+        for i := range parts {
+            parts[i] = strings.ToLower(parts[i])
+        }
+        done <- result{parts, nil}
+        c.mu.Unlock()
+    }()
+
+    select {
+    case r := <-done:
+        return r.bad, r.err
+    case <-time.After(timeout):
+        // Kill the process to unblock the pending read.
+        _ = cmd.Process.Kill()
+        // Ensure the goroutine finishes and releases the lock.
+        <-done
+        return nil, context.DeadlineExceeded
+    }
+}

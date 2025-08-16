@@ -12,3 +12,6 @@
 # Local test file
 /textText.txt
 testText.txt
+
+# Ephemeral test binaries and their caches
+/testbin-*/
