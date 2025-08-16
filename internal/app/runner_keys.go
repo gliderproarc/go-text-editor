@@ -87,8 +87,14 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			return false
 		case 'o':
 			if r.Buf != nil {
-				_, end := r.currentLineBounds()
-				r.Cursor = end
+				start, end := r.currentLineBounds()
+				// Insert the new line before the existing newline (if present)
+				// so the cursor lands on exactly one new line below, not past it.
+				pos := end
+				if end > start && r.Buf.RuneAt(end-1) == '\n' {
+					pos = end - 1
+				}
+				r.Cursor = pos
 				r.insertText("\n")
 			}
 			r.Mode = ModeInsert
@@ -663,8 +669,12 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 		return false
 	case ev.Key() == tcell.KeyRune && ev.Rune() == 'o' && ev.Modifiers() == 0:
 		if r.Buf != nil {
-			_, end := r.currentLineBounds()
-			r.Cursor = end
+			start, end := r.currentLineBounds()
+			pos := end
+			if end > start && r.Buf.RuneAt(end-1) == '\n' {
+				pos = end - 1
+			}
+			r.Cursor = pos
 			r.insertText("\n")
 		}
 		r.Mode = ModeInsert
