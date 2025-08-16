@@ -124,6 +124,22 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.PendingD = true
 			}
 			return false
+		case 'x':
+			// Cut the character at the cursor in normal mode
+			if r.Buf != nil && r.Cursor < r.Buf.Len() {
+				start := r.Cursor
+				end := start + 1
+				text := string(r.Buf.Slice(start, end))
+				_ = r.deleteRange(start, end, text)
+				r.KillRing.Set(text)
+				if r.Logger != nil {
+					r.Logger.Event("action", map[string]any{"name": "cut.normal", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+				}
+				if r.Screen != nil {
+					r.draw(nil)
+				}
+			}
+			return false
 		case 'G':
 			if r.Buf != nil && r.Buf.Len() > 0 {
 				r.Cursor = r.Buf.Len() - 1

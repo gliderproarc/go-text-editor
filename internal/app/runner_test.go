@@ -423,6 +423,24 @@ func TestVisualCutX(t *testing.T) {
 	}
 }
 
+func TestNormalCutX_DeletesCharAtCursor(t *testing.T) {
+    r := &Runner{Buf: buffer.NewGapBufferFromString("cat"), Cursor: 1, Mode: ModeNormal, KillRing: history.KillRing{}}
+    // Press 'x' in normal mode to cut the character under the cursor
+    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'x', 0))
+    if got := r.Buf.String(); got != "ct" {
+        t.Fatalf("expected buffer 'ct', got %q", got)
+    }
+    if r.Cursor != 1 { // cursor stays at same index, now on 't'
+        t.Fatalf("expected cursor to remain at 1 on 't', got %d", r.Cursor)
+    }
+    if kr := r.KillRing.Get(); kr != "a" {
+        t.Fatalf("expected kill ring to contain 'a', got %q", kr)
+    }
+    if r.Mode != ModeNormal {
+        t.Fatalf("expected to remain in normal mode after 'x'")
+    }
+}
+
 func TestVisualLineSelectionCut(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("abc\ndef\nghi"), KillRing: history.KillRing{}}
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'V', 0))
