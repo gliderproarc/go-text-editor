@@ -41,6 +41,8 @@ type Theme struct {
     // Spell check highlights (background)
     HighlightSpellBG tcell.Color
     HighlightSpellFG tcell.Color
+    // Spell check underline color (used when misspellings are underlined)
+    HighlightSpellUnderlineFG tcell.Color
 
     // Syntax groups (keyword, string, comment, number, type, function, ...)
     SyntaxColors map[string]tcell.Color
@@ -78,6 +80,8 @@ func DefaultTheme() Theme {
         // Spell check highlight: use magenta background with readable fg
         HighlightSpellBG: tcell.ColorFuchsia,
         HighlightSpellFG: tcell.ColorWhite,
+        // Underline misspellings in red by default
+        HighlightSpellUnderlineFG: tcell.ColorRed,
 
         SyntaxColors: map[string]tcell.Color{
             "keyword":  tcell.ColorRed,
@@ -131,6 +135,8 @@ func TerminalTheme() Theme {
         // Spell check highlight: use palette magenta and default fg
         HighlightSpellBG: tcell.ColorFuchsia,
         HighlightSpellFG: tcell.ColorDefault,
+        // Underline misspellings in red (palette red)
+        HighlightSpellUnderlineFG: tcell.ColorRed,
 
         // Syntax groups mapped to ANSI palette; actual shades come from terminal
         SyntaxColors: map[string]tcell.Color{
@@ -178,6 +184,7 @@ var BuiltinThemes = map[string]Theme{
 
         HighlightSpellBG: tcell.ColorFuchsia,
         HighlightSpellFG: tcell.ColorWhite,
+        HighlightSpellUnderlineFG: tcell.ColorRed,
 
         SyntaxColors: map[string]tcell.Color{
             "keyword":  tcell.ColorRed,

@@ -143,6 +143,8 @@ func Load(path string) (*Config, error) {
                 cfg.Theme.HighlightSpellBG = ParseColor(v, cfg.Theme.HighlightSpellBG)
             case "highlight.spell.fg":
                 cfg.Theme.HighlightSpellFG = ParseColor(v, cfg.Theme.HighlightSpellFG)
+            case "highlight.spell.underline.fg", "highlight.spell.underline":
+                cfg.Theme.HighlightSpellUnderlineFG = ParseColor(v, cfg.Theme.HighlightSpellUnderlineFG)
             default:
                 if strings.HasPrefix(strings.ToLower(k), "syntax.") {
                     group := strings.TrimPrefix(strings.ToLower(k), "syntax.")

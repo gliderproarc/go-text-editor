@@ -218,9 +218,11 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
         // - bgHL marks background highlights (search/selection)
         // - bgGroup stores background highlight category (e.g., "bg.search.current")
         // - fgGroup stores syntax group per rune (colored foreground)
+        // - ulHL marks underline attribute (used for spell-check misspellings)
         bgHL := make([]bool, len(runes))
         bgGroup := make([]string, len(runes))
         fgGroup := make([]string, len(runes))
+        ulHL := make([]bool, len(runes))
         if len(highlights) > 0 {
             lineBytesLen := len(line)
             lineStartByte := lineStart
@@ -260,6 +262,9 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
                             // explicit background highlight kinds
                             bgHL[ri] = true
                             bgGroup[ri] = h.Group
+                        case "bg.spell":
+                            // Spell-check: visually underline characters (no bg)
+                            ulHL[ri] = true
                         default:
                             // syntax foreground coloring
                             fgGroup[ri] = h.Group
@@ -285,12 +290,13 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
                     // Subtle visual selection highlight
                     bg = th.SelectBG
                     fg = th.SelectFG
-                } else if g := bgGroup[j]; g == "bg.spell" {
-                    // Spell-check background highlight
-                    bg = th.HighlightSpellBG
-                    fg = th.HighlightSpellFG
                 }
-                s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(fg).Background(bg))
+                style := tcell.StyleDefault.Foreground(fg).Background(bg)
+                if j < len(ulHL) && ulHL[j] {
+                    // Underline and use the configured underline color for fg
+                    style = style.Foreground(th.HighlightSpellUnderlineFG).Attributes(tcell.AttrUnderline)
+                }
+                s.SetContent(j, i, ch, nil, style)
             default:
                 // syntax foreground coloring if present
                 if g := fgGroup[j]; g != "" {
@@ -306,9 +312,24 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
                     if g == "function" {
                         style = style.Attributes(tcell.AttrBold)
                     }
+                    if j < len(ulHL) && ulHL[j] {
+                        // Switch to underline color and include underline attribute.
+                        // Preserve simple bold/dim cases explicitly.
+                        if g == "comment" {
+                            style = tcell.StyleDefault.Foreground(th.HighlightSpellUnderlineFG).Attributes(tcell.AttrDim | tcell.AttrUnderline)
+                        } else if g == "function" {
+                            style = tcell.StyleDefault.Foreground(th.HighlightSpellUnderlineFG).Attributes(tcell.AttrBold | tcell.AttrUnderline)
+                        } else {
+                            style = tcell.StyleDefault.Foreground(th.HighlightSpellUnderlineFG).Attributes(tcell.AttrUnderline)
+                        }
+                    }
                     s.SetContent(j, i, ch, nil, style)
                 } else {
-                    s.SetContent(j, i, ch, nil, tcell.StyleDefault.Foreground(th.TextDefault))
+                    style := tcell.StyleDefault.Foreground(th.TextDefault)
+                    if j < len(ulHL) && ulHL[j] {
+                        style = tcell.StyleDefault.Foreground(th.HighlightSpellUnderlineFG).Attributes(tcell.AttrUnderline)
+                    }
+                    s.SetContent(j, i, ch, nil, style)
                 }
             }
         }

@@ -138,13 +138,16 @@ Timeouts
 
 Spell Checking (IPC Prototype)
 ------------------------------
-- The editor can pipe whitespace-separated words to an external spell checker process and highlight words that need checking in the viewport.
+- The editor can pipe whitespace-separated words to an external spell checker process and underline words that need checking in the viewport (visual only; file contents are unchanged).
 - Protocol: one request line contains space-separated words; one response line contains the subset of words to highlight (also space-separated). Words are treated case-insensitively.
 - Toggle via command menu: open the command palette (Space in normal mode or Alt+M in insert), search for "spell: toggle".
   - Default: uses `./aspellbridge` which wraps `aspell -a`. If `aspellbridge` fails, it falls back to `./spellmock`.
   - Override with environment: set `TEXTEDITOR_SPELL=/path/to/custom-checker` to force a specific command.
 - Recheck the viewport at any time with the command "spell: recheck"; otherwise, checks trigger when the viewport changes.
-- Highlight color is configurable in the theme as `highlight.spell.bg` and `highlight.spell.fg`.
+
+Underline color
+- Terminals don’t support a separate underline color via tcell; to get a red underline we render the text in that color while applying underline. Configure with `highlight.spell.underline.fg` (default: red).
+
 
 Note on async behavior
 - The "spell: check word" (word-at-point) command runs a one-shot check with a short timeout so it won’t block the UI if the external checker stalls. Configure the timeout via `TEXTEDITOR_SPELL_TIMEOUT_MS` (default: 500ms).
