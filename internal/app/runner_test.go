@@ -424,21 +424,21 @@ func TestVisualCutX(t *testing.T) {
 }
 
 func TestNormalCutX_DeletesCharAtCursor(t *testing.T) {
-    r := &Runner{Buf: buffer.NewGapBufferFromString("cat"), Cursor: 1, Mode: ModeNormal, KillRing: history.KillRing{}}
-    // Press 'x' in normal mode to cut the character under the cursor
-    r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'x', 0))
-    if got := r.Buf.String(); got != "ct" {
-        t.Fatalf("expected buffer 'ct', got %q", got)
-    }
-    if r.Cursor != 1 { // cursor stays at same index, now on 't'
-        t.Fatalf("expected cursor to remain at 1 on 't', got %d", r.Cursor)
-    }
-    if kr := r.KillRing.Get(); kr != "a" {
-        t.Fatalf("expected kill ring to contain 'a', got %q", kr)
-    }
-    if r.Mode != ModeNormal {
-        t.Fatalf("expected to remain in normal mode after 'x'")
-    }
+	r := &Runner{Buf: buffer.NewGapBufferFromString("cat"), Cursor: 1, Mode: ModeNormal, KillRing: history.KillRing{}}
+	// Press 'x' in normal mode to cut the character under the cursor
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'x', 0))
+	if got := r.Buf.String(); got != "ct" {
+		t.Fatalf("expected buffer 'ct', got %q", got)
+	}
+	if r.Cursor != 1 { // cursor stays at same index, now on 't'
+		t.Fatalf("expected cursor to remain at 1 on 't', got %d", r.Cursor)
+	}
+	if kr := r.KillRing.Get(); kr != "a" {
+		t.Fatalf("expected kill ring to contain 'a', got %q", kr)
+	}
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected to remain in normal mode after 'x'")
+	}
 }
 
 func TestVisualLineSelectionCut(t *testing.T) {
@@ -635,6 +635,32 @@ func TestRunner_UndoRedo(t *testing.T) {
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', tcell.ModCtrl))
 	if got := r.Buf.String(); got != "ab" {
 		t.Fatalf("expected 'ab' after second redo, got %q", got)
+	}
+}
+
+func TestRunner_NormalModeUndoRedoKeys(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBuffer(0), History: history.New(), Mode: ModeNormal}
+	// Enter insert mode and type 'a', 'b'
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
+	// Exit insert mode
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	if got := r.Buf.String(); got != "ab" {
+		t.Fatalf("expected buffer 'ab' before undo, got %q", got)
+	}
+	// Undo via normal-mode 'u'
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'u', 0))
+	if got := r.Buf.String(); got != "a" {
+		t.Fatalf("expected 'a' after undo with 'u', got %q", got)
+	}
+	// Redo via Ctrl+R in normal mode
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'r', tcell.ModCtrl))
+	if got := r.Buf.String(); got != "ab" {
+		t.Fatalf("expected 'ab' after redo with Ctrl+R, got %q", got)
+	}
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected to remain in normal mode, got %v", r.Mode)
 	}
 }
 

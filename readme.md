@@ -353,7 +353,7 @@ Reference Plugin (for milestone M8)
 		•	Ctrl+W: Search (incremental)
 		•	Ctrl+K: Cut to end of line
 		•	Ctrl+U/Ctrl+Y: Paste (yank)
-		•	Ctrl+Z / Ctrl+Y: Undo / Redo
+		•	Ctrl+Z / Ctrl+Y: Undo / Redo (also: u undo, Ctrl+R redo in normal mode)
 		•	Ctrl+A/Ctrl+E: Line start/end (insert)
 		•	F2: Contextual Command Menu
 (Remappable in config at M5.)
@@ -584,3 +584,7 @@ Upcoming (after M8)
 Notes
 - The existing UI already includes open/save prompts, search/go-to, and quit confirmation; the plan above focuses on configurability and multi-buffer ergonomics next.
 - Consider consolidating duplicated helpers (drawUI/drawHelp) found in cmd/texteditor and internal/app/runner.go during M5 refactors.
+
+Vim-style mode emulation (snapshot)
+- Current coverage: normal/insert/visual modes with h/j/k/l and word motions (w/b/e), line home/end (0/$), page-ish jumps (gg/G, Ctrl+D/Ctrl+U), line delete (dd), character cut (x), line-open (o), paste-after (p), visual yank/cut (y/x), and undo/redo from normal mode (u, Ctrl+R) alongside Ctrl+Z/Ctrl+Y.
+- TODO: line yank (yy/Y) and paste-before (P) to round out common operators; change/delete word operators (cw/dw) plus simple dot-repeat; counts for motions/operators (e.g., 3w, 2dd) to make normal mode feel closer to Vim basics.

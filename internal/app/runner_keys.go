@@ -55,6 +55,9 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.Mode = ModeInsert
 			r.draw(nil)
 			return false
+		case 'u':
+			r.performUndo("undo.normal")
+			return false
 		case 'v':
 			r.Mode = ModeVisual
 			r.VisualStart = r.Cursor
@@ -295,20 +298,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	}
 	// Ctrl+Z -> undo (handle both rune+Ctrl and dedicated control key)
 	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'z' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlZ {
-        if r.History != nil {
-            if err := r.History.Undo(r.Buf, &r.Cursor); err == nil {
-                // Buffer mutated via undo
-                r.editSeq++
-            }
-            r.recomputeCursorLine()
-            r.Dirty = true
-			if r.Logger != nil {
-				r.Logger.Event("action", map[string]any{"name": "undo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
-			}
-			if r.Screen != nil {
-				r.draw(nil)
-			}
-		}
+		r.performUndo("undo")
 		return false
 	}
 	// Ctrl+Y -> yank in insert mode, redo otherwise
@@ -324,19 +314,15 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 					r.draw(nil)
 				}
 			}
-        } else if r.History != nil {
-            if err := r.History.Redo(r.Buf, &r.Cursor); err == nil {
-                // Buffer mutated via redo
-                r.editSeq++
-            }
-            r.recomputeCursorLine()
-            r.Dirty = true
-			if r.Logger != nil {
-				r.Logger.Event("action", map[string]any{"name": "redo", "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
-			}
-			if r.Screen != nil {
-				r.draw(nil)
-			}
+		} else {
+			r.performRedo("redo")
+		}
+		return false
+	}
+	// Ctrl+R -> redo in normal/visual modes
+	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'r' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlR {
+		if r.Mode != ModeInsert {
+			r.performRedo("redo.ctrlr")
 		}
 		return false
 	}
@@ -747,4 +733,38 @@ func (r *Runner) matchCommand(ev *tcell.EventKey, name string) bool {
 		return false
 	}
 	return kb.Matches(ev)
+}
+
+func (r *Runner) performUndo(action string) {
+	if r.History == nil {
+		return
+	}
+	if err := r.History.Undo(r.Buf, &r.Cursor); err == nil {
+		r.editSeq++
+	}
+	r.recomputeCursorLine()
+	r.Dirty = true
+	if r.Logger != nil {
+		r.Logger.Event("action", map[string]any{"name": action, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+	}
+	if r.Screen != nil {
+		r.draw(nil)
+	}
+}
+
+func (r *Runner) performRedo(action string) {
+	if r.History == nil {
+		return
+	}
+	if err := r.History.Redo(r.Buf, &r.Cursor); err == nil {
+		r.editSeq++
+	}
+	r.recomputeCursorLine()
+	r.Dirty = true
+	if r.Logger != nil {
+		r.Logger.Event("action", map[string]any{"name": action, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+	}
+	if r.Screen != nil {
+		r.draw(nil)
+	}
 }
