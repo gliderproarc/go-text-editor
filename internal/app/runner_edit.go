@@ -1,6 +1,20 @@
 package app
 
-import "example.com/texteditor/pkg/search"
+import (
+	"example.com/texteditor/pkg/buffer"
+	"example.com/texteditor/pkg/search"
+)
+
+type repeatableChange struct {
+	count int
+	apply func(count int)
+}
+
+type insertCapture struct {
+	count   int
+	builder func(text string, count int)
+	text    []rune
+}
 
 // visualHighlightRange returns the current visual selection as byte offsets.
 func (r *Runner) visualSelectionBounds() (start, end int) {
@@ -43,8 +57,8 @@ func (r *Runner) visualHighlightRange() []search.Range {
 	}
 	startBytes := len(string(runes[:start]))
 	endBytes := len(string(runes[:end]))
-    // Tag as visual selection so renderer can style it subtly
-    return []search.Range{{Start: startBytes, End: endBytes, Group: "bg.select"}}
+	// Tag as visual selection so renderer can style it subtly
+	return []search.Range{{Start: startBytes, End: endBytes, Group: "bg.select"}}
 }
 
 // insertText inserts text at the current cursor, records history, and updates state.
@@ -52,6 +66,7 @@ func (r *Runner) insertText(text string) {
 	if text == "" {
 		return
 	}
+	r.captureInsertText(text)
 	_ = r.Buf.Insert(r.Cursor, []rune(text))
 	if r.History != nil {
 		r.History.RecordInsert(r.Cursor, text)
@@ -63,10 +78,162 @@ func (r *Runner) insertText(text string) {
 			r.CursorLine++
 		}
 	}
-    r.Dirty = true
-    r.syntaxSrc = ""
-    // Mark buffer content changed for spell re-check coalescing
-    r.editSeq++
+	r.Dirty = true
+	r.syntaxSrc = ""
+	// Mark buffer content changed for spell re-check coalescing
+	r.editSeq++
+}
+
+func (r *Runner) captureInsertText(text string) {
+	if r.insertCapture == nil || text == "" {
+		return
+	}
+	r.insertCapture.text = append(r.insertCapture.text, []rune(text)...)
+}
+
+func (r *Runner) beginInsertCapture(count int, builder func(text string, count int)) {
+	if count == 0 {
+		count = 1
+	}
+	r.insertCapture = &insertCapture{count: count, builder: builder}
+}
+
+func (r *Runner) finalizeInsertCapture() {
+	if r.insertCapture == nil {
+		return
+	}
+	text := string(r.insertCapture.text)
+	if r.insertCapture.builder != nil {
+		r.insertCapture.builder(text, r.insertCapture.count)
+	}
+	r.insertCapture = nil
+}
+
+func (r *Runner) consumeCount() int {
+	if r.PendingCount == 0 {
+		return 1
+	}
+	count := r.PendingCount
+	r.PendingCount = 0
+	return count
+}
+
+func (r *Runner) setLastChange(fn func(count int), count int) {
+	if fn == nil {
+		r.lastChange = nil
+		return
+	}
+	if count < 1 {
+		count = 1
+	}
+	r.lastChange = &repeatableChange{apply: fn, count: count}
+}
+
+func (r *Runner) repeatLastChange(count int) {
+	if r.lastChange == nil {
+		return
+	}
+	if count < 1 {
+		count = r.lastChange.count
+	}
+	r.lastChange.apply(count)
+}
+
+func (r *Runner) deleteLines(count int) {
+	if r.Buf == nil || count < 1 {
+		return
+	}
+	start, _ := r.currentLineBounds()
+	end := start
+	for i := 0; i < count && end < r.Buf.Len(); i++ {
+		for end < r.Buf.Len() && r.Buf.RuneAt(end) != '\n' {
+			end++
+		}
+		if end < r.Buf.Len() {
+			end++
+		}
+	}
+	if end <= start {
+		return
+	}
+	text := string(r.Buf.Slice(start, end))
+	_ = r.deleteRange(start, end, text)
+	r.KillRing.Set(text)
+	r.recomputeCursorLine()
+	if r.Logger != nil {
+		r.Logger.Event("action", map[string]any{"name": "delete.line", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+	}
+	if r.Screen != nil {
+		r.draw(nil)
+	}
+	r.setLastChange(func(c int) { r.deleteLines(c) }, count)
+}
+
+func (r *Runner) deleteChars(count int) {
+	if r.Buf == nil || count < 1 {
+		return
+	}
+	if r.Cursor >= r.Buf.Len() {
+		return
+	}
+	start := r.Cursor
+	end := start + count
+	if end > r.Buf.Len() {
+		end = r.Buf.Len()
+	}
+	text := string(r.Buf.Slice(start, end))
+	_ = r.deleteRange(start, end, text)
+	r.KillRing.Set(text)
+	if r.Logger != nil {
+		r.Logger.Event("action", map[string]any{"name": "cut.normal", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+	}
+	if r.Screen != nil {
+		r.draw(nil)
+	}
+	r.setLastChange(func(c int) { r.deleteChars(c) }, count)
+}
+
+func (r *Runner) deleteWords(count int) string {
+	if r.Buf == nil || count < 1 {
+		return ""
+	}
+	start := r.Cursor
+	end := start
+	for i := 0; i < count; i++ {
+		end = buffer.NextWordStart(r.Buf, end)
+	}
+	if end <= start {
+		return ""
+	}
+	text := string(r.Buf.Slice(start, end))
+	_ = r.deleteRange(start, end, text)
+	r.KillRing.Set(text)
+	r.recomputeCursorLine()
+	if r.Logger != nil {
+		r.Logger.Event("action", map[string]any{"name": "delete.word", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+	}
+	if r.Screen != nil {
+		r.draw(nil)
+	}
+	r.setLastChange(func(c int) { r.deleteWords(c) }, count)
+	return text
+}
+
+func (r *Runner) changeWords(count int, replacement string) {
+	if count < 1 {
+		count = 1
+	}
+	deleted := r.deleteWords(count)
+	if replacement != "" {
+		r.insertText(replacement)
+	}
+	if r.Logger != nil {
+		r.Logger.Event("action", map[string]any{"name": "change.word", "deleted": deleted, "inserted": replacement, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+	}
+	if r.Screen != nil {
+		r.draw(nil)
+	}
+	r.setLastChange(func(c int) { r.changeWords(c, replacement) }, count)
 }
 
 // deleteRange deletes [start,end) with provided text for history and updates cursor.
@@ -107,11 +274,11 @@ func (r *Runner) deleteRange(start, end int, text string) error {
 			r.CursorLine = 0
 		}
 	}
-    r.Dirty = true
-    r.syntaxSrc = ""
-    // Mark buffer content changed for spell re-check coalescing
-    r.editSeq++
-    return nil
+	r.Dirty = true
+	r.syntaxSrc = ""
+	// Mark buffer content changed for spell re-check coalescing
+	r.editSeq++
+	return nil
 }
 
 // moveCursorVertical moves the cursor up or down by delta lines, preserving the column when possible.

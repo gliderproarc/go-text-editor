@@ -34,34 +34,38 @@ const (
 
 // Runner owns the terminal lifecycle and a minimal event loop.
 type Runner struct {
-	Screen      tcell.Screen
-	FilePath    string
-	Buf         *buffer.GapBuffer
-	Cursor      int // cursor position in runes
-	CursorLine  int // 0-based current line index (maintained incrementally)
-	TopLine     int // first visible line index
-	Dirty       bool
-	Ed          *editor.Editor
-	ShowHelp    bool
-	Mode        Mode
-	VisualStart int
-	VisualLine  bool
-	History     *history.History
-	KillRing    history.KillRing
-	Logger      *logs.Logger
-	MiniBuf     []string
-	Keymap      map[string]config.Keybinding
-	Theme       config.Theme
-	themeList   []themeEntry
-	themeIndex  int
-	EventCh     chan tcell.Event
-	RenderCh    chan renderState
-	PendingG    bool
-	PendingD    bool
-	PendingY    bool
-	Syntax      plugins.Highlighter
-	syntaxSrc   string
-	syntaxCache []search.Range
+	Screen        tcell.Screen
+	FilePath      string
+	Buf           *buffer.GapBuffer
+	Cursor        int // cursor position in runes
+	CursorLine    int // 0-based current line index (maintained incrementally)
+	TopLine       int // first visible line index
+	Dirty         bool
+	Ed            *editor.Editor
+	ShowHelp      bool
+	Mode          Mode
+	VisualStart   int
+	VisualLine    bool
+	History       *history.History
+	KillRing      history.KillRing
+	Logger        *logs.Logger
+	MiniBuf       []string
+	Keymap        map[string]config.Keybinding
+	Theme         config.Theme
+	themeList     []themeEntry
+	themeIndex    int
+	EventCh       chan tcell.Event
+	RenderCh      chan renderState
+	PendingG      bool
+	PendingD      bool
+	PendingY      bool
+	PendingC      bool
+	PendingCount  int
+	lastChange    *repeatableChange
+	insertCapture *insertCapture
+	Syntax        plugins.Highlighter
+	syntaxSrc     string
+	syntaxCache   []search.Range
 	// Async syntax highlighting state
 	SyntaxAsync *SyntaxState
 	// current transient overlay (search/menu) to inform status bar

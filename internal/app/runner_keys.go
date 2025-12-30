@@ -4,6 +4,7 @@ import (
 	"example.com/texteditor/pkg/buffer"
 	"example.com/texteditor/pkg/config"
 	"github.com/gdamore/tcell/v2"
+	"unicode"
 )
 
 // handleKeyEvent processes a key event. It returns true if the event signals
@@ -14,23 +15,58 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		if r.PendingG && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == 0) {
 			r.PendingG = false
 		}
-		if r.PendingD && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'd' && ev.Modifiers() == 0) {
-			r.PendingD = false
+		if r.PendingD {
+			if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
+				if ev.Rune() != 'd' && ev.Rune() != 'w' && !unicode.IsDigit(ev.Rune()) {
+					r.PendingD = false
+				}
+			} else {
+				r.PendingD = false
+			}
 		}
-		if r.PendingY && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'y' && ev.Modifiers() == 0) {
-			r.PendingY = false
+		if r.PendingC {
+			if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
+				if ev.Rune() != 'w' && !unicode.IsDigit(ev.Rune()) {
+					r.PendingC = false
+				}
+			} else {
+				r.PendingC = false
+			}
+		}
+		if r.PendingY {
+			if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
+				if ev.Rune() != 'y' && !unicode.IsDigit(ev.Rune()) {
+					r.PendingY = false
+				}
+			} else {
+				r.PendingY = false
+			}
 		}
 	case ModeInsert:
 		r.PendingG = false
 		r.PendingD = false
 		r.PendingY = false
+		r.PendingC = false
+	}
+	// Count prefixes in normal mode (digits)
+	if r.Mode == ModeNormal && ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
+		if ev.Rune() >= '1' && ev.Rune() <= '9' {
+			r.PendingCount = r.PendingCount*10 + int(ev.Rune()-'0')
+			return false
+		}
+		if ev.Rune() == '0' && r.PendingCount > 0 {
+			r.PendingCount = r.PendingCount * 10
+			return false
+		}
 	}
 	// Mode transitions similar to Vim
 	if ev.Key() == tcell.KeyEsc {
 		switch r.Mode {
 		case ModeInsert:
+			r.finalizeInsertCapture()
 			r.Mode = ModeNormal
 			r.PendingY = false
+			r.PendingCount = 0
 			r.draw(nil)
 			return false
 		case ModeVisual:
@@ -39,6 +75,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.VisualLine = false
 			r.PendingG = false
 			r.PendingY = false
+			r.PendingCount = 0
 			r.draw(nil)
 			return false
 		default:
@@ -48,10 +85,26 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	if r.Mode == ModeNormal && ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
 		switch ev.Rune() {
 		case 'i':
+			count := r.consumeCount()
 			r.Mode = ModeInsert
+			r.beginInsertCapture(count, func(text string, _ int) {
+				if text == "" {
+					r.setLastChange(nil, 0)
+					return
+				}
+				r.setLastChange(func(c int) {
+					for i := 0; i < c; i++ {
+						r.insertText(text)
+					}
+					if r.Screen != nil {
+						r.draw(nil)
+					}
+				}, 1)
+			})
 			r.draw(nil)
 			return false
 		case 'a':
+			count := r.consumeCount()
 			if r.Buf != nil && r.Cursor < r.Buf.Len() {
 				if r.Buf.RuneAt(r.Cursor) == '\n' {
 					r.CursorLine++
@@ -59,18 +112,43 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.Cursor++
 			}
 			r.Mode = ModeInsert
+			r.beginInsertCapture(count, func(text string, _ int) {
+				if text == "" {
+					r.setLastChange(nil, 0)
+					return
+				}
+				r.setLastChange(func(c int) {
+					for i := 0; i < c; i++ {
+						if r.Buf != nil && r.Cursor < r.Buf.Len() {
+							if r.Buf.RuneAt(r.Cursor) == '\n' {
+								r.CursorLine++
+							}
+							r.Cursor++
+						}
+						r.insertText(text)
+					}
+					if r.Screen != nil {
+						r.draw(nil)
+					}
+				}, 1)
+			})
 			r.draw(nil)
 			return false
 		case 'u':
-			r.performUndo("undo.normal")
+			count := r.consumeCount()
+			for i := 0; i < count; i++ {
+				r.performUndo("undo.normal")
+			}
 			return false
 		case 'v':
+			_ = r.consumeCount()
 			r.Mode = ModeVisual
 			r.VisualStart = r.Cursor
 			r.VisualLine = false
 			r.draw(nil)
 			return false
 		case 'V':
+			_ = r.consumeCount()
 			if r.Buf != nil {
 				start, _ := r.currentLineBounds()
 				r.Cursor = start
@@ -83,18 +161,21 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.draw(nil)
 			return false
 		case 'p':
+			count := r.consumeCount()
 			if r.KillRing.HasData() {
 				text := r.KillRing.Get()
-				if r.Buf != nil && r.Cursor < r.Buf.Len() {
-					// paste after the cursor position
-					if r.Buf.RuneAt(r.Cursor) == '\n' {
-						r.CursorLine++
+				for i := 0; i < count; i++ {
+					if r.Buf != nil && r.Cursor < r.Buf.Len() {
+						// paste after the cursor position
+						if r.Buf.RuneAt(r.Cursor) == '\n' {
+							r.CursorLine++
+						}
+						r.Cursor++
 					}
-					r.Cursor++
+					r.insertText(text)
 				}
-				r.insertText(text)
 				if r.Logger != nil {
-					r.Logger.Event("action", map[string]any{"name": "paste.normal", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+					r.Logger.Event("action", map[string]any{"name": "paste.normal", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 				}
 				if r.Screen != nil {
 					r.draw(nil)
@@ -102,11 +183,14 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			}
 			return false
 		case 'P':
+			count := r.consumeCount()
 			if r.KillRing.HasData() {
 				text := r.KillRing.Get()
-				r.insertText(text)
+				for i := 0; i < count; i++ {
+					r.insertText(text)
+				}
 				if r.Logger != nil {
-					r.Logger.Event("action", map[string]any{"name": "paste.before", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+					r.Logger.Event("action", map[string]any{"name": "paste.before", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 				}
 				if r.Screen != nil {
 					r.draw(nil)
@@ -114,6 +198,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			}
 			return false
 		case 'o':
+			count := r.consumeCount()
 			if r.Buf != nil {
 				start, end := r.currentLineBounds()
 				// Insert the new line before the existing newline (if present)
@@ -126,41 +211,69 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 				r.insertText("\n")
 			}
 			r.Mode = ModeInsert
+			r.beginInsertCapture(count, func(text string, c int) {
+				r.setLastChange(func(times int) {
+					for i := 0; i < times*c; i++ {
+						if r.Buf != nil {
+							start, end := r.currentLineBounds()
+							pos := end
+							if end > start && r.Buf.RuneAt(end-1) == '\n' {
+								pos = end - 1
+							}
+							r.Cursor = pos
+						}
+						r.insertText("\n")
+						if text != "" {
+							r.insertText(text)
+						}
+					}
+					if r.Screen != nil {
+						r.draw(nil)
+					}
+				}, c)
+			})
 			if r.Screen != nil {
 				r.draw(nil)
+			}
+			return false
+		case 'c':
+			if r.PendingC {
+				r.PendingC = false
+			} else {
+				r.PendingC = true
 			}
 			return false
 		case 'd':
 			if r.PendingD {
 				r.PendingD = false
-				if r.Buf != nil {
-					start, end := r.currentLineBounds()
-					if end > start {
-						text := string(r.Buf.Slice(start, end))
-						_ = r.deleteRange(start, end, text)
-						r.KillRing.Set(text)
-						r.recomputeCursorLine()
-						if r.Logger != nil {
-							r.Logger.Event("action", map[string]any{"name": "delete.line", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
-						}
-						if r.Screen != nil {
-							r.draw(nil)
-						}
-					}
-				}
+				count := r.consumeCount()
+				r.deleteLines(count)
 			} else {
 				r.PendingD = true
 			}
+			return false
+		case '.':
+			count := r.consumeCount()
+			r.repeatLastChange(count)
 			return false
 		case 'y':
 			if r.PendingY {
 				r.PendingY = false
 				if r.Buf != nil {
+					count := r.consumeCount()
 					start, end := r.currentLineBounds()
+					for i := 1; i < count && end < r.Buf.Len(); i++ {
+						for end < r.Buf.Len() && r.Buf.RuneAt(end) != '\n' {
+							end++
+						}
+						if end < r.Buf.Len() {
+							end++
+						}
+					}
 					text := string(r.Buf.Slice(start, end))
 					r.KillRing.Set(text)
 					if r.Logger != nil {
-						r.Logger.Event("action", map[string]any{"name": "yank.line", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+						r.Logger.Event("action", map[string]any{"name": "yank.line", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 					}
 				}
 			} else {
@@ -168,49 +281,87 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			}
 			return false
 		case 'Y':
+			count := r.consumeCount()
 			if r.Buf != nil {
 				start, end := r.currentLineBounds()
+				for i := 1; i < count && end < r.Buf.Len(); i++ {
+					for end < r.Buf.Len() && r.Buf.RuneAt(end) != '\n' {
+						end++
+					}
+					if end < r.Buf.Len() {
+						end++
+					}
+				}
 				text := string(r.Buf.Slice(start, end))
 				r.KillRing.Set(text)
 				if r.Logger != nil {
-					r.Logger.Event("action", map[string]any{"name": "yank.line", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+					r.Logger.Event("action", map[string]any{"name": "yank.line", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 				}
 			}
 			r.PendingY = false
 			return false
 		case 'x':
-			// Cut the character at the cursor in normal mode
-			if r.Buf != nil && r.Cursor < r.Buf.Len() {
-				start := r.Cursor
-				end := start + 1
-				text := string(r.Buf.Slice(start, end))
-				_ = r.deleteRange(start, end, text)
-				r.KillRing.Set(text)
-				if r.Logger != nil {
-					r.Logger.Event("action", map[string]any{"name": "cut.normal", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
-				}
-				if r.Screen != nil {
-					r.draw(nil)
-				}
-			}
+			// Cut the character(s) at the cursor in normal mode
+			count := r.consumeCount()
+			r.deleteChars(count)
 			return false
 		case 'G':
+			hasCount := r.PendingCount > 0
+			count := r.consumeCount()
 			if r.Buf != nil && r.Buf.Len() > 0 {
-				r.Cursor = r.Buf.Len() - 1
-				lines := r.Buf.Lines()
-				last := len(lines) - 1
-				if last > 0 && len(lines[last]) == 0 {
-					last--
+				if hasCount {
+					lines := r.Buf.Lines()
+					line := count - 1
+					if line < 0 {
+						line = 0
+					}
+					if len(lines) == 0 {
+						line = 0
+					} else if line > len(lines)-1 {
+						line = len(lines) - 1
+					}
+					start, _ := r.Buf.LineAt(line)
+					r.Cursor = start
+					r.CursorLine = line
+				} else {
+					r.Cursor = r.Buf.Len() - 1
+					lines := r.Buf.Lines()
+					last := len(lines) - 1
+					if last > 0 && len(lines[last]) == 0 {
+						last--
+					}
+					r.CursorLine = last
 				}
-				r.CursorLine = last
 			}
 			if r.Screen != nil {
 				r.draw(nil)
 			}
 			return false
 		case 'w':
+			count := r.consumeCount()
+			if r.PendingD {
+				r.PendingD = false
+				r.deleteWords(count)
+				return false
+			}
+			if r.PendingC {
+				r.PendingC = false
+				r.deleteWords(count)
+				r.Mode = ModeInsert
+				r.beginInsertCapture(count, func(text string, c int) {
+					r.setLastChange(func(times int) {
+						r.changeWords(times, text)
+					}, c)
+				})
+				if r.Screen != nil {
+					r.draw(nil)
+				}
+				return false
+			}
 			if r.Buf != nil {
-				r.Cursor = buffer.NextWordStart(r.Buf, r.Cursor)
+				for i := 0; i < count; i++ {
+					r.Cursor = buffer.NextWordStart(r.Buf, r.Cursor)
+				}
 				r.recomputeCursorLine()
 			}
 			if r.Screen != nil {
@@ -218,8 +369,11 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			}
 			return false
 		case 'b':
+			count := r.consumeCount()
 			if r.Buf != nil {
-				r.Cursor = buffer.WordStart(r.Buf, r.Cursor)
+				for i := 0; i < count; i++ {
+					r.Cursor = buffer.WordStart(r.Buf, r.Cursor)
+				}
 				r.recomputeCursorLine()
 			}
 			if r.Screen != nil {
@@ -227,10 +381,56 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			}
 			return false
 		case 'e':
+			count := r.consumeCount()
 			if r.Buf != nil {
-				r.Cursor = buffer.WordEnd(r.Buf, r.Cursor)
+				for i := 0; i < count; i++ {
+					r.Cursor = buffer.WordEnd(r.Buf, r.Cursor)
+				}
 				r.recomputeCursorLine()
 			}
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		case 'h':
+			count := r.consumeCount()
+			for i := 0; i < count && r.Cursor > 0; i++ {
+				if r.Buf != nil && r.Buf.RuneAt(r.Cursor-1) == '\n' {
+					r.CursorLine--
+					if r.CursorLine < 0 {
+						r.CursorLine = 0
+					}
+				}
+				r.Cursor--
+			}
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		case 'l':
+			count := r.consumeCount()
+			for i := 0; i < count; i++ {
+				if r.Buf != nil && r.Cursor < r.Buf.Len() {
+					if r.Buf.RuneAt(r.Cursor) == '\n' {
+						r.CursorLine++
+					}
+					r.Cursor++
+				}
+			}
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		case 'k':
+			count := r.consumeCount()
+			r.moveCursorVertical(-count)
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return false
+		case 'j':
+			count := r.consumeCount()
+			r.moveCursorVertical(count)
 			if r.Screen != nil {
 				r.draw(nil)
 			}
@@ -238,9 +438,27 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		case 'g':
 			if r.PendingG {
 				r.PendingG = false
+				hasCount := r.PendingCount > 0
+				count := r.consumeCount()
 				if r.Buf != nil {
-					r.Cursor = 0
-					r.CursorLine = 0
+					if hasCount {
+						line := count - 1
+						if line < 0 {
+							line = 0
+						}
+						lines := r.Buf.Lines()
+						if len(lines) == 0 {
+							line = 0
+						} else if line > len(lines)-1 {
+							line = len(lines) - 1
+						}
+						start, _ := r.Buf.LineAt(line)
+						r.Cursor = start
+						r.CursorLine = line
+					} else {
+						r.Cursor = 0
+						r.CursorLine = 0
+					}
 				}
 				if r.Screen != nil {
 					r.draw(nil)
@@ -250,6 +468,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			}
 			return false
 		case '$':
+			_ = r.consumeCount()
 			if r.Buf != nil {
 				_, end := r.currentLineBounds()
 				if end > 0 && r.Buf.RuneAt(end-1) == '\n' {
@@ -271,6 +490,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			}
 			return false
 		case ' ':
+			_ = r.consumeCount()
 			return r.runMnemonicMenu()
 		}
 	}
