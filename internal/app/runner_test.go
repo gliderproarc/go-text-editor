@@ -314,6 +314,15 @@ func TestWordEndVisualMode(t *testing.T) {
 	}
 }
 
+func TestWordMotionCount(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("one two three"), Mode: ModeNormal}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, '3', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'w', 0))
+	if r.Cursor != len([]rune("one two three")) {
+		t.Fatalf("expected cursor at end after 3w, got %d", r.Cursor)
+	}
+}
+
 func TestGotoTopAndBottomNormalMode(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("abc\ndef\nghi"), Cursor: 5, Mode: ModeNormal}
 	r.recomputeCursorLine()
@@ -403,6 +412,35 @@ func TestNormalDeleteLineDD(t *testing.T) {
 	}
 	if kr := r.KillRing.Get(); kr != "hello\n" {
 		t.Fatalf("expected kill ring to contain 'hello\\n', got %q", kr)
+	}
+}
+
+func TestNormalDeleteWordCount(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("one two three"), KillRing: history.KillRing{}, Mode: ModeNormal}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, '2', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'd', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'w', 0))
+	if got := r.Buf.String(); got != "three" {
+		t.Fatalf("expected buffer 'three', got %q", got)
+	}
+	if kr := r.KillRing.Get(); kr != "one two " {
+		t.Fatalf("expected kill ring to contain deleted words, got %q", kr)
+	}
+}
+
+func TestDotRepeatsDeleteLine(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("one\ntwo\nthree"), KillRing: history.KillRing{}, Mode: ModeNormal}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'd', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'd', 0))
+	if got := r.Buf.String(); got != "two\nthree" {
+		t.Fatalf("expected buffer 'two\\nthree' after first delete, got %q", got)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, '.', 0))
+	if got := r.Buf.String(); got != "three" {
+		t.Fatalf("expected buffer 'three' after dot repeat, got %q", got)
+	}
+	if r.KillRing.Get() != "two\n" {
+		t.Fatalf("expected kill ring to contain last deleted line, got %q", r.KillRing.Get())
 	}
 }
 
@@ -584,6 +622,27 @@ func TestRunner_PasteBefore(t *testing.T) {
 	}
 	if r.KillRing.Get() != "XY" {
 		t.Fatalf("expected kill ring to remain unchanged after paste-before")
+	}
+}
+
+func TestChangeWordDotRepeat(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("one two three"), Mode: ModeNormal, KillRing: history.KillRing{}}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'c', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'w', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'O', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'N', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'E', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, ' ', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	if got := r.Buf.String(); got != "ONE two three" {
+		t.Fatalf("expected buffer 'ONE two three' after change word, got %q", got)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, '.', 0))
+	if got := r.Buf.String(); got != "ONE ONE three" {
+		t.Fatalf("expected buffer 'ONE ONE three' after dot repeat, got %q", got)
+	}
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected to remain in normal mode after repeat, got %v", r.Mode)
 	}
 }
 
