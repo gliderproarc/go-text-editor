@@ -253,7 +253,10 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			}
 			return false
 		case '.':
-			count := r.consumeCount()
+			count := 0
+			if r.PendingCount > 0 {
+				count = r.consumeCount()
+			}
 			r.repeatLastChange(count)
 			return false
 		case 'y':
