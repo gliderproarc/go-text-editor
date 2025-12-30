@@ -587,4 +587,5 @@ Notes
 
 Vim-style mode emulation (snapshot)
 - Current coverage: normal/insert/visual modes with h/j/k/l and word motions (w/b/e), line home/end (0/$), page-ish jumps (gg/G, Ctrl+D/Ctrl+U), line delete (dd), character cut (x), line-open (o), paste-after (p), visual yank/cut (y/x), and undo/redo from normal mode (u, Ctrl+R) alongside Ctrl+Z/Ctrl+Y.
-- TODO: line yank (yy/Y) and paste-before (P) to round out common operators; change/delete word operators (cw/dw) plus simple dot-repeat; counts for motions/operators (e.g., 3w, 2dd) to make normal mode feel closer to Vim basics.
+- Added line yank (yy/Y) and paste-before (P) to round out common operators.
+- TODO: change/delete word operators (cw/dw) plus simple dot-repeat; counts for motions/operators (e.g., 3w, 2dd) to make normal mode feel closer to Vim basics.
