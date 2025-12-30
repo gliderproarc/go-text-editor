@@ -17,15 +17,20 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		if r.PendingD && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'd' && ev.Modifiers() == 0) {
 			r.PendingD = false
 		}
+		if r.PendingY && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'y' && ev.Modifiers() == 0) {
+			r.PendingY = false
+		}
 	case ModeInsert:
 		r.PendingG = false
 		r.PendingD = false
+		r.PendingY = false
 	}
 	// Mode transitions similar to Vim
 	if ev.Key() == tcell.KeyEsc {
 		switch r.Mode {
 		case ModeInsert:
 			r.Mode = ModeNormal
+			r.PendingY = false
 			r.draw(nil)
 			return false
 		case ModeVisual:
@@ -33,6 +38,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.VisualStart = -1
 			r.VisualLine = false
 			r.PendingG = false
+			r.PendingY = false
 			r.draw(nil)
 			return false
 		default:
@@ -79,9 +85,28 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		case 'p':
 			if r.KillRing.HasData() {
 				text := r.KillRing.Get()
+				if r.Buf != nil && r.Cursor < r.Buf.Len() {
+					// paste after the cursor position
+					if r.Buf.RuneAt(r.Cursor) == '\n' {
+						r.CursorLine++
+					}
+					r.Cursor++
+				}
 				r.insertText(text)
 				if r.Logger != nil {
 					r.Logger.Event("action", map[string]any{"name": "paste.normal", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+				}
+				if r.Screen != nil {
+					r.draw(nil)
+				}
+			}
+			return false
+		case 'P':
+			if r.KillRing.HasData() {
+				text := r.KillRing.Get()
+				r.insertText(text)
+				if r.Logger != nil {
+					r.Logger.Event("action", map[string]any{"name": "paste.before", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 				}
 				if r.Screen != nil {
 					r.draw(nil)
@@ -126,6 +151,32 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			} else {
 				r.PendingD = true
 			}
+			return false
+		case 'y':
+			if r.PendingY {
+				r.PendingY = false
+				if r.Buf != nil {
+					start, end := r.currentLineBounds()
+					text := string(r.Buf.Slice(start, end))
+					r.KillRing.Set(text)
+					if r.Logger != nil {
+						r.Logger.Event("action", map[string]any{"name": "yank.line", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+					}
+				}
+			} else {
+				r.PendingY = true
+			}
+			return false
+		case 'Y':
+			if r.Buf != nil {
+				start, end := r.currentLineBounds()
+				text := string(r.Buf.Slice(start, end))
+				r.KillRing.Set(text)
+				if r.Logger != nil {
+					r.Logger.Event("action", map[string]any{"name": "yank.line", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+				}
+			}
+			r.PendingY = false
 			return false
 		case 'x':
 			// Cut the character at the cursor in normal mode

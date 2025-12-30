@@ -558,17 +558,61 @@ func TestRunner_NormalPaste(t *testing.T) {
 	r.KillRing.Set("XY")
 	// Paste at cursor in normal mode
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'p', 0))
-	if got := r.Buf.String(); got != "hXYello" {
-		t.Fatalf("expected buffer 'hXYello' after paste, got %q", got)
+	if got := r.Buf.String(); got != "heXYllo" {
+		t.Fatalf("expected buffer 'heXYllo' after paste, got %q", got)
 	}
 	if r.Mode != ModeNormal {
 		t.Fatalf("expected mode to remain normal after paste")
 	}
-	if r.Cursor != 1+len("XY") {
-		t.Fatalf("expected cursor at %d after paste, got %d", 1+len("XY"), r.Cursor)
+	if r.Cursor != 2+len("XY") {
+		t.Fatalf("expected cursor at %d after paste, got %d", 2+len("XY"), r.Cursor)
 	}
 	if r.KillRing.Get() != "XY" {
 		t.Fatalf("expected kill ring to remain unchanged after paste")
+	}
+}
+
+func TestRunner_PasteBefore(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), Cursor: 2, History: history.New()}
+	r.KillRing.Set("XY")
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'P', 0))
+	if got := r.Buf.String(); got != "heXYllo" {
+		t.Fatalf("expected buffer 'heXYllo' after paste-before, got %q", got)
+	}
+	if r.Cursor != 2+len("XY") {
+		t.Fatalf("expected cursor at %d after paste-before, got %d", 2+len("XY"), r.Cursor)
+	}
+	if r.KillRing.Get() != "XY" {
+		t.Fatalf("expected kill ring to remain unchanged after paste-before")
+	}
+}
+
+func TestRunner_LineYank(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("abc\ndef"), Cursor: 1, History: history.New()}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'y', 0))
+	if got := r.KillRing.Get(); got != "abc\n" {
+		t.Fatalf("expected kill ring to contain first line, got %q", got)
+	}
+	if got := r.Buf.String(); got != "abc\ndef" {
+		t.Fatalf("expected buffer unchanged after yank, got %q", got)
+	}
+	if r.PendingY {
+		t.Fatalf("expected pending Y reset after line yank")
+	}
+}
+
+func TestRunner_LineYankUppercase(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("abc\ndef"), Cursor: 4, History: history.New()}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'Y', 0))
+	if got := r.KillRing.Get(); got != "def" {
+		t.Fatalf("expected kill ring to contain current line, got %q", got)
+	}
+	if got := r.Buf.String(); got != "abc\ndef" {
+		t.Fatalf("expected buffer unchanged after Y yank, got %q", got)
+	}
+	if r.PendingY {
+		t.Fatalf("expected pending Y reset after Y")
 	}
 }
 

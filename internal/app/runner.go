@@ -17,9 +17,9 @@ import (
 type Mode int
 
 const (
-    ModeNormal Mode = iota
-    ModeInsert
-    ModeVisual
+	ModeNormal Mode = iota
+	ModeInsert
+	ModeVisual
 )
 
 // Overlay represents transient UI states that override status indicator
@@ -27,16 +27,16 @@ const (
 type Overlay int
 
 const (
-    OverlayNone Overlay = iota
-    OverlaySearch
-    OverlayMenu
+	OverlayNone Overlay = iota
+	OverlaySearch
+	OverlayMenu
 )
 
 // Runner owns the terminal lifecycle and a minimal event loop.
 type Runner struct {
-    Screen      tcell.Screen
-    FilePath    string
-    Buf         *buffer.GapBuffer
+	Screen      tcell.Screen
+	FilePath    string
+	Buf         *buffer.GapBuffer
 	Cursor      int // cursor position in runes
 	CursorLine  int // 0-based current line index (maintained incrementally)
 	TopLine     int // first visible line index
@@ -49,26 +49,27 @@ type Runner struct {
 	History     *history.History
 	KillRing    history.KillRing
 	Logger      *logs.Logger
-    MiniBuf     []string
-    Keymap      map[string]config.Keybinding
-    Theme       config.Theme
-    themeList   []themeEntry
-    themeIndex  int
-    EventCh     chan tcell.Event
-    RenderCh    chan renderState
-    PendingG    bool
-    PendingD    bool
-    Syntax      plugins.Highlighter
-    syntaxSrc   string
-    syntaxCache []search.Range
-    // Async syntax highlighting state
-    SyntaxAsync *SyntaxState
-    // current transient overlay (search/menu) to inform status bar
-    Overlay     Overlay
-    // Spell checking subsystem state
-    Spell       *SpellState
-    // Monotonic edit sequence; increments on any buffer mutation (insert/delete/undo/redo).
-    editSeq     int64
+	MiniBuf     []string
+	Keymap      map[string]config.Keybinding
+	Theme       config.Theme
+	themeList   []themeEntry
+	themeIndex  int
+	EventCh     chan tcell.Event
+	RenderCh    chan renderState
+	PendingG    bool
+	PendingD    bool
+	PendingY    bool
+	Syntax      plugins.Highlighter
+	syntaxSrc   string
+	syntaxCache []search.Range
+	// Async syntax highlighting state
+	SyntaxAsync *SyntaxState
+	// current transient overlay (search/menu) to inform status bar
+	Overlay Overlay
+	// Spell checking subsystem state
+	Spell *SpellState
+	// Monotonic edit sequence; increments on any buffer mutation (insert/delete/undo/redo).
+	editSeq int64
 }
 
 func (r *Runner) setMiniBuffer(lines []string) {
@@ -94,11 +95,11 @@ func (r *Runner) waitEvent() tcell.Event {
 
 // New creates an empty Runner.
 func New() *Runner {
-    ed := editor.New()
-    bs := editor.BufferState{Buf: buffer.NewGapBuffer(0)}
-    ed.AddBuffer(bs)
-    // Start with terminal-compliant theme so the app follows terminal colors
-    return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Theme: config.TerminalTheme(), Ed: ed}
+	ed := editor.New()
+	bs := editor.BufferState{Buf: buffer.NewGapBuffer(0)}
+	ed.AddBuffer(bs)
+	// Start with terminal-compliant theme so the app follows terminal colors
+	return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Theme: config.TerminalTheme(), Ed: ed}
 }
 
 // cursorLine returns the current 0-based line index of the cursor.
