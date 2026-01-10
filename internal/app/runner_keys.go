@@ -15,31 +15,46 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		if r.PendingG && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == 0) {
 			r.PendingG = false
 		}
+		if r.PendingTextObject {
+			if ev.Key() != tcell.KeyRune || ev.Modifiers() != 0 || !isTextObjectDelimiter(ev.Rune()) {
+				r.PendingTextObject = false
+				r.TextObjectAround = false
+				r.PendingD = false
+				r.PendingC = false
+				r.PendingY = false
+			}
+		}
 		if r.PendingD {
-			if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
-				if ev.Rune() != 'd' && ev.Rune() != 'w' && !unicode.IsDigit(ev.Rune()) {
+			if !r.PendingTextObject {
+				if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
+					if ev.Rune() != 'd' && ev.Rune() != 'w' && ev.Rune() != 'i' && ev.Rune() != 'a' && !unicode.IsDigit(ev.Rune()) {
+						r.PendingD = false
+					}
+				} else {
 					r.PendingD = false
 				}
-			} else {
-				r.PendingD = false
 			}
 		}
 		if r.PendingC {
-			if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
-				if ev.Rune() != 'w' && !unicode.IsDigit(ev.Rune()) {
+			if !r.PendingTextObject {
+				if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
+					if ev.Rune() != 'w' && ev.Rune() != 'i' && ev.Rune() != 'a' && !unicode.IsDigit(ev.Rune()) {
+						r.PendingC = false
+					}
+				} else {
 					r.PendingC = false
 				}
-			} else {
-				r.PendingC = false
 			}
 		}
 		if r.PendingY {
-			if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
-				if ev.Rune() != 'y' && !unicode.IsDigit(ev.Rune()) {
+			if !r.PendingTextObject {
+				if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
+					if ev.Rune() != 'y' && ev.Rune() != 'i' && ev.Rune() != 'a' && !unicode.IsDigit(ev.Rune()) {
+						r.PendingY = false
+					}
+				} else {
 					r.PendingY = false
 				}
-			} else {
-				r.PendingY = false
 			}
 		}
 	case ModeInsert:
@@ -47,6 +62,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		r.PendingD = false
 		r.PendingY = false
 		r.PendingC = false
+		r.PendingTextObject = false
+		r.TextObjectAround = false
 	}
 	// Count prefixes in normal mode (digits)
 	if r.Mode == ModeNormal && ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
@@ -59,6 +76,43 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			return false
 		}
 	}
+	if r.Mode == ModeNormal && ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
+		if (r.PendingD || r.PendingC || r.PendingY) && (ev.Rune() == 'i' || ev.Rune() == 'a') {
+			r.PendingTextObject = true
+			r.TextObjectAround = ev.Rune() == 'a'
+			return false
+		}
+		if r.PendingTextObject && isTextObjectDelimiter(ev.Rune()) {
+			count := r.consumeCount()
+			delim := ev.Rune()
+			around := r.TextObjectAround
+			r.PendingTextObject = false
+			r.TextObjectAround = false
+			switch {
+			case r.PendingD:
+				r.PendingD = false
+				r.deleteTextObject(delim, around, count)
+				return false
+			case r.PendingC:
+				r.PendingC = false
+				r.deleteTextObject(delim, around, count)
+				r.Mode = ModeInsert
+				r.beginInsertCapture(count, func(text string, c int) {
+					r.setLastChange(func(times int) {
+						r.changeTextObject(delim, around, times, text)
+					}, c)
+				})
+				if r.Screen != nil {
+					r.draw(nil)
+				}
+				return false
+			case r.PendingY:
+				r.PendingY = false
+				r.yankTextObject(delim, around, count)
+				return false
+			}
+		}
+	}
 	// Mode transitions similar to Vim
 	if ev.Key() == tcell.KeyEsc {
 		switch r.Mode {
@@ -66,6 +120,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.finalizeInsertCapture()
 			r.Mode = ModeNormal
 			r.PendingY = false
+			r.PendingTextObject = false
+			r.TextObjectAround = false
 			r.PendingCount = 0
 			r.draw(nil)
 			return false
@@ -75,6 +131,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			r.VisualLine = false
 			r.PendingG = false
 			r.PendingY = false
+			r.PendingTextObject = false
+			r.TextObjectAround = false
 			r.PendingCount = 0
 			r.draw(nil)
 			return false
@@ -505,6 +563,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		r.VisualStart = -1
 		r.VisualLine = false
 		r.PendingG = false
+		r.PendingTextObject = false
+		r.TextObjectAround = false
 		r.draw(nil)
 		return false
 	}
@@ -828,6 +888,25 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 	if r.PendingG && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == 0) {
 		r.PendingG = false
 	}
+	if r.PendingTextObject {
+		if ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 && isTextObjectDelimiter(ev.Rune()) {
+			_ = r.consumeCount()
+			start, end, ok := r.textObjectBounds(ev.Rune(), r.TextObjectAround)
+			r.PendingTextObject = false
+			r.TextObjectAround = false
+			if ok {
+				r.VisualStart = start
+				r.VisualLine = false
+				r.Cursor = end - 1
+				r.draw(nil)
+			}
+			return false
+		}
+		if ev.Key() != tcell.KeyRune || ev.Modifiers() != 0 || !isTextObjectDelimiter(ev.Rune()) {
+			r.PendingTextObject = false
+			r.TextObjectAround = false
+		}
+	}
 	switch {
 	case r.PendingG && ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == 0:
 		r.PendingG = false
@@ -839,6 +918,10 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 		return false
 	case ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == 0:
 		r.PendingG = true
+		return false
+	case ev.Key() == tcell.KeyRune && (ev.Rune() == 'i' || ev.Rune() == 'a') && ev.Modifiers() == 0:
+		r.PendingTextObject = true
+		r.TextObjectAround = ev.Rune() == 'a'
 		return false
 	case ev.Key() == tcell.KeyRune && ev.Rune() == 'G':
 		if r.Buf != nil && r.Buf.Len() > 0 {

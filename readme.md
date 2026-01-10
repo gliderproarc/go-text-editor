@@ -589,3 +589,8 @@ Vim-style mode emulation (snapshot)
 - Current coverage: normal/insert/visual modes with h/j/k/l and word motions (w/b/e), line home/end (0/$), page-ish jumps (gg/G, Ctrl+D/Ctrl+U), line delete (dd), character cut (x), line-open (o), paste-after (p), visual yank/cut (y/x), and undo/redo from normal mode (u, Ctrl+R) alongside Ctrl+Z/Ctrl+Y.
 - Added line yank (yy/Y) and paste-before (P) to round out common operators.
 - Added change/delete word operators (cw/dw), dot-repeat for the last change, and counts for motions/operators (e.g., 3w, 2dd) to make normal mode feel closer to Vim basics.
+- Planned (milestones):
+  - V1 text objects: add inner/around selections for quotes/parens/brackets/braces (vi", va", vi', va', vi), va), vi], va], vi}, va}).
+  - V1 operators: support delete/change/yank using the text objects (di", ci", yi" plus other delimiters).
+  - V1 visual parity: ensure visual mode uses the same text-object selection logic and keeps counts working.
+  - V1 tests: add unit coverage for text-object selection and operator integration (including edge cases like nested or missing delimiters).

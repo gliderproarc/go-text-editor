@@ -74,3 +74,50 @@ func TestHandleKeyEvent_ChangeWordDotRepeat(t *testing.T) {
 		t.Fatalf("expected buffer %q after dot-repeat, got %q", "ONE ONE three", got)
 	}
 }
+
+func TestHandleKeyEvent_DeleteInnerQuotes(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("say \"hello\" world"), History: history.New(), Cursor: 6}
+
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'd', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, '"', 0))
+
+	if got := r.Buf.String(); got != "say \"\" world" {
+		t.Fatalf("expected buffer %q after di\" , got %q", "say \"\" world", got)
+	}
+	if r.Cursor != 5 {
+		t.Fatalf("expected cursor at 5 after di\", got %d", r.Cursor)
+	}
+}
+
+func TestHandleKeyEvent_ChangeInnerQuotes(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("say \"hello\" world"), History: history.New(), Cursor: 6}
+
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'c', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, '"', 0))
+	for _, ch := range []rune("hey") {
+		r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, ch, 0))
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+
+	if got := r.Buf.String(); got != "say \"hey\" world" {
+		t.Fatalf("expected buffer %q after ci\", got %q", "say \"hey\" world", got)
+	}
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected mode to return to normal after Esc, got %v", r.Mode)
+	}
+}
+
+func TestHandleKeyEvent_VisualInnerQuotes(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("say \"hello\" world"), History: history.New(), Cursor: 6}
+
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, '"', 0))
+
+	start, end := r.visualSelectionBounds()
+	if start != 5 || end != 10 {
+		t.Fatalf("expected visual bounds 5..10 after vi\", got %d..%d", start, end)
+	}
+}

@@ -61,6 +61,89 @@ func (r *Runner) visualHighlightRange() []search.Range {
 	return []search.Range{{Start: startBytes, End: endBytes, Group: "bg.select"}}
 }
 
+func isTextObjectDelimiter(delim rune) bool {
+	switch delim {
+	case '"', '\'', '`', '(', ')', '[', ']', '{', '}':
+		return true
+	default:
+		return false
+	}
+}
+
+func textObjectPair(delim rune) (open, close rune, ok bool) {
+	switch delim {
+	case '"', '\'', '`':
+		return delim, delim, true
+	case '(', ')':
+		return '(', ')', true
+	case '[', ']':
+		return '[', ']', true
+	case '{', '}':
+		return '{', '}', true
+	default:
+		return 0, 0, false
+	}
+}
+
+func (r *Runner) textObjectBounds(delim rune, around bool) (start, end int, ok bool) {
+	if r.Buf == nil || r.Buf.Len() == 0 {
+		return 0, 0, false
+	}
+	open, close, ok := textObjectPair(delim)
+	if !ok {
+		return 0, 0, false
+	}
+	cursor := r.Cursor
+	if cursor < 0 {
+		cursor = 0
+	}
+	if cursor >= r.Buf.Len() {
+		cursor = r.Buf.Len() - 1
+	}
+	leftSearch := cursor
+	rightSearch := cursor
+	if open == close {
+		if r.Buf.RuneAt(cursor) == open {
+			leftSearch = cursor - 1
+			rightSearch = cursor
+		}
+	} else {
+		if r.Buf.RuneAt(cursor) == open {
+			rightSearch = cursor + 1
+		} else if r.Buf.RuneAt(cursor) == close {
+			leftSearch = cursor - 1
+		}
+	}
+	left := -1
+	for i := leftSearch; i >= 0; i-- {
+		if r.Buf.RuneAt(i) == open {
+			left = i
+			break
+		}
+	}
+	right := -1
+	for i := rightSearch; i < r.Buf.Len(); i++ {
+		if r.Buf.RuneAt(i) == close {
+			right = i
+			break
+		}
+	}
+	if left == -1 || right == -1 || left >= right {
+		return 0, 0, false
+	}
+	if around {
+		start = left
+		end = right + 1
+	} else {
+		start = left + 1
+		end = right
+	}
+	if start < 0 || end > r.Buf.Len() || start >= end {
+		return 0, 0, false
+	}
+	return start, end, true
+}
+
 // insertText inserts text at the current cursor, records history, and updates state.
 func (r *Runner) insertText(text string) {
 	if text == "" {
@@ -234,6 +317,70 @@ func (r *Runner) changeWords(count int, replacement string) {
 		r.draw(nil)
 	}
 	r.setLastChange(func(c int) { r.changeWords(c, replacement) }, count)
+}
+
+func (r *Runner) yankTextObject(delim rune, around bool, count int) {
+	if count < 1 {
+		count = 1
+	}
+	for i := 0; i < count; i++ {
+		start, end, ok := r.textObjectBounds(delim, around)
+		if !ok {
+			return
+		}
+		text := string(r.Buf.Slice(start, end))
+		r.KillRing.Set(text)
+		if r.Logger != nil {
+			r.Logger.Event("action", map[string]any{"name": "yank.textobject", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+		}
+	}
+}
+
+func (r *Runner) deleteTextObject(delim rune, around bool, count int) {
+	if count < 1 {
+		count = 1
+	}
+	for i := 0; i < count; i++ {
+		start, end, ok := r.textObjectBounds(delim, around)
+		if !ok {
+			return
+		}
+		text := string(r.Buf.Slice(start, end))
+		_ = r.deleteRange(start, end, text)
+		r.KillRing.Set(text)
+		r.recomputeCursorLine()
+		if r.Logger != nil {
+			r.Logger.Event("action", map[string]any{"name": "delete.textobject", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+		}
+	}
+	if r.Screen != nil {
+		r.draw(nil)
+	}
+	r.setLastChange(func(c int) { r.deleteTextObject(delim, around, c) }, count)
+}
+
+func (r *Runner) changeTextObject(delim rune, around bool, count int, replacement string) {
+	if count < 1 {
+		count = 1
+	}
+	for i := 0; i < count; i++ {
+		start, end, ok := r.textObjectBounds(delim, around)
+		if !ok {
+			return
+		}
+		deleted := string(r.Buf.Slice(start, end))
+		_ = r.deleteRange(start, end, deleted)
+		if replacement != "" {
+			r.insertText(replacement)
+		}
+		if r.Logger != nil {
+			r.Logger.Event("action", map[string]any{"name": "change.textobject", "deleted": deleted, "inserted": replacement, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+		}
+	}
+	if r.Screen != nil {
+		r.draw(nil)
+	}
+	r.setLastChange(func(c int) { r.changeTextObject(delim, around, c, replacement) }, count)
 }
 
 // deleteRange deletes [start,end) with provided text for history and updates cursor.

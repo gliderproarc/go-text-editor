@@ -1,0 +1,3 @@
+{
+  "recommendations": ["golang.go", "golangci.golangci-lint"]
+}
