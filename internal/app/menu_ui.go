@@ -1,10 +1,10 @@
 package app
 
 import (
-    "os"
-    "strings"
+	"os"
+	"strings"
 
-    "github.com/gdamore/tcell/v2"
+	"github.com/gdamore/tcell/v2"
 )
 
 type command struct {
@@ -13,71 +13,72 @@ type command struct {
 }
 
 func (r *Runner) commandList() []command {
-    return []command{
-        {name: "open file", action: func() bool { r.runOpenPrompt(); return false }},
-        {name: "save", action: func() bool {
-            if r.FilePath == "" {
-                r.runSaveAsPrompt()
-            } else {
-                if err := r.Save(); err == nil {
-                    r.showDialog("Saved " + r.FilePath)
-                }
-            }
-            if r.Logger != nil {
-                r.Logger.Event("action", map[string]any{"name": "save", "file": r.FilePath})
-            }
-            return false
-        }},
-        {name: "spell: toggle", action: func() bool {
-            if r.Spell != nil && r.Spell.Enabled {
-                r.DisableSpellCheck()
-                r.showDialog("Spell checking disabled")
-                return false
-            }
-            cmd := os.Getenv("TEXTEDITOR_SPELL")
-            var err error
-            if cmd != "" {
-                err = r.EnableSpellCheck(cmd)
-            } else {
-                // Default to aspell bridge; fall back to mock if unavailable
-                if err = r.EnableSpellCheck("./aspellbridge"); err != nil {
-                    err = r.EnableSpellCheck("./spellmock")
-                }
-            }
-            if err != nil {
-                r.showDialog("Spell enable failed: " + err.Error())
-            } else {
-                r.showDialog("Spell checking enabled")
-            }
-            return false
-        }},
-        {name: "spell: recheck", action: func() bool { r.updateSpellAsync(); return false }},
-        {name: "spell: check word", action: func() bool { r.CheckWordAtCursor(); return false }},
-        {name: "theme: next", action: func() bool { r.NextTheme(); return false }},
-        {name: "theme: previous", action: func() bool { r.PrevTheme(); return false }},
-        {name: "search", action: func() bool { r.runSearchPrompt(); return false }},
-        {name: "go to line", action: func() bool { r.runGoToPrompt(); return false }},
-        {name: "help", action: func() bool { r.ShowHelp = true; r.draw(nil); return false }},
-        {name: "quit", action: func() bool {
-            if r.Dirty {
-                return r.runQuitPrompt()
-            }
-            return true
-        }},
-    }
+	return []command{
+		{name: "open file", action: func() bool { r.runOpenPrompt(); return false }},
+		{name: "save", action: func() bool {
+			if r.FilePath == "" {
+				r.runSaveAsPrompt()
+			} else {
+				if err := r.Save(); err == nil {
+					r.showDialog("Saved " + r.FilePath)
+				}
+			}
+			if r.Logger != nil {
+				r.Logger.Event("action", map[string]any{"name": "save", "file": r.FilePath})
+			}
+			return false
+		}},
+		{name: "spell: toggle", action: func() bool {
+			if r.Spell != nil && r.Spell.Enabled {
+				r.DisableSpellCheck()
+				r.showDialog("Spell checking disabled")
+				return false
+			}
+			cmd := os.Getenv("TEXTEDITOR_SPELL")
+			var err error
+			if cmd != "" {
+				err = r.EnableSpellCheck(cmd)
+			} else {
+				// Default to aspell bridge; fall back to mock if unavailable
+				if err = r.EnableSpellCheck("./aspellbridge"); err != nil {
+					err = r.EnableSpellCheck("./spellmock")
+				}
+			}
+			if err != nil {
+				r.showDialog("Spell enable failed: " + err.Error())
+			} else {
+				r.showDialog("Spell checking enabled")
+			}
+			return false
+		}},
+		{name: "spell: recheck", action: func() bool { r.updateSpellAsync(); return false }},
+		{name: "spell: check word", action: func() bool { r.CheckWordAtCursor(); return false }},
+		{name: "theme: next", action: func() bool { r.NextTheme(); return false }},
+		{name: "theme: previous", action: func() bool { r.PrevTheme(); return false }},
+		{name: "clipboard: cycle", action: func() bool { r.yankPop(); return false }},
+		{name: "search", action: func() bool { r.runSearchPrompt(); return false }},
+		{name: "go to line", action: func() bool { r.runGoToPrompt(); return false }},
+		{name: "help", action: func() bool { r.ShowHelp = true; r.draw(nil); return false }},
+		{name: "quit", action: func() bool {
+			if r.Dirty {
+				return r.runQuitPrompt()
+			}
+			return true
+		}},
+	}
 }
 
 // runCommandMenu opens a mini-buffer menu listing commands. It supports
 // fuzzy filtering by typing and navigation with Ctrl+P/Ctrl+N. Enter executes
 // the highlighted command. It returns true if the command requests to quit.
 func (r *Runner) runCommandMenu() bool {
-    if r.Screen == nil {
-        return false
-    }
-    // Show menu overlay so status bar displays <M>
-    r.Overlay = OverlayMenu
-    defer func() { r.Overlay = OverlayNone }()
-    cmds := r.commandList()
+	if r.Screen == nil {
+		return false
+	}
+	// Show menu overlay so status bar displays <M>
+	r.Overlay = OverlayMenu
+	defer func() { r.Overlay = OverlayNone }()
+	cmds := r.commandList()
 	query := ""
 	sel := 0
 	filtered := cmds

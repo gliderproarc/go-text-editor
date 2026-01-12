@@ -76,6 +76,13 @@ type Runner struct {
 	Spell *SpellState
 	// Monotonic edit sequence; increments on any buffer mutation (insert/delete/undo/redo).
 	editSeq int64
+	// Last yank (paste) range for yank-pop.
+	lastYankStart int
+	lastYankEnd   int
+	lastYankCount int
+	lastYankValid bool
+	// True while performing yank/paste operations to avoid clearing yank state.
+	yankInProgress bool
 }
 
 func (r *Runner) setMiniBuffer(lines []string) {
@@ -105,7 +112,7 @@ func New() *Runner {
 	bs := editor.BufferState{Buf: buffer.NewGapBuffer(0)}
 	ed.AddBuffer(bs)
 	// Start with terminal-compliant theme so the app follows terminal colors
-	return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Theme: config.TerminalTheme(), Ed: ed}
+	return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Theme: config.TerminalTheme(), Ed: ed, lastYankStart: -1, lastYankEnd: -1}
 }
 
 // cursorLine returns the current 0-based line index of the cursor.

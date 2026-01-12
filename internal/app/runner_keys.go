@@ -222,16 +222,18 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			count := r.consumeCount()
 			if r.KillRing.HasData() {
 				text := r.KillRing.Get()
-				for i := 0; i < count; i++ {
-					if r.Buf != nil && r.Cursor < r.Buf.Len() {
-						// paste after the cursor position
-						if r.Buf.RuneAt(r.Cursor) == '\n' {
-							r.CursorLine++
-						}
-						r.Cursor++
+				if r.Buf != nil && r.Cursor < r.Buf.Len() {
+					// paste after the cursor position
+					if r.Buf.RuneAt(r.Cursor) == '\n' {
+						r.CursorLine++
 					}
+					r.Cursor++
+				}
+				start := r.beginYankTracking()
+				for i := 0; i < count; i++ {
 					r.insertText(text)
 				}
+				r.endYankTracking(start, count)
 				if r.Logger != nil {
 					r.Logger.Event("action", map[string]any{"name": "paste.normal", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 				}
@@ -244,9 +246,11 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			count := r.consumeCount()
 			if r.KillRing.HasData() {
 				text := r.KillRing.Get()
+				start := r.beginYankTracking()
 				for i := 0; i < count; i++ {
 					r.insertText(text)
 				}
+				r.endYankTracking(start, count)
 				if r.Logger != nil {
 					r.Logger.Event("action", map[string]any{"name": "paste.before", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 				}
@@ -332,7 +336,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 						}
 					}
 					text := string(r.Buf.Slice(start, end))
-					r.KillRing.Set(text)
+					r.clearYankState()
+					r.KillRing.Push(text)
 					if r.Logger != nil {
 						r.Logger.Event("action", map[string]any{"name": "yank.line", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 					}
@@ -354,7 +359,8 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 					}
 				}
 				text := string(r.Buf.Slice(start, end))
-				r.KillRing.Set(text)
+				r.clearYankState()
+				r.KillRing.Push(text)
 				if r.Logger != nil {
 					r.Logger.Event("action", map[string]any{"name": "yank.line", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 				}
@@ -640,7 +646,9 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		if r.Mode == ModeInsert {
 			if r.KillRing.HasData() {
 				text := r.KillRing.Get()
+				start := r.beginYankTracking()
 				r.insertText(text)
+				r.endYankTracking(start, 1)
 				if r.Logger != nil {
 					r.Logger.Event("action", map[string]any{"name": "yank", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 				}
@@ -854,7 +862,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			if end > start {
 				text := string(r.Buf.Slice(start, end))
 				_ = r.deleteRange(start, end, text)
-				r.KillRing.Set(text)
+				r.KillRing.Push(text)
 				if r.Logger != nil {
 					r.Logger.Event("action", map[string]any{"name": "cut.insert", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 				}
@@ -869,7 +877,9 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	if r.Mode == ModeInsert && ((ev.Key() == tcell.KeyRune && ev.Rune() == 'u' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlU) {
 		if r.KillRing.HasData() {
 			text := r.KillRing.Get()
+			start := r.beginYankTracking()
 			r.insertText(text)
+			r.endYankTracking(start, 1)
 			if r.Logger != nil {
 				r.Logger.Event("action", map[string]any{"name": "yank", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 			}
@@ -1046,7 +1056,8 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 			start, end := r.visualSelectionBounds()
 			if start < end {
 				text := string(r.Buf.Slice(start, end))
-				r.KillRing.Set(text)
+				r.clearYankState()
+				r.KillRing.Push(text)
 				if r.Logger != nil {
 					r.Logger.Event("action", map[string]any{"name": "yank.visual", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 				}
@@ -1064,7 +1075,7 @@ func (r *Runner) handleVisualKey(ev *tcell.EventKey) bool {
 			if start < end {
 				text := string(r.Buf.Slice(start, end))
 				_ = r.deleteRange(start, end, text)
-				r.KillRing.Set(text)
+				r.KillRing.Push(text)
 				if r.Logger != nil {
 					r.Logger.Event("action", map[string]any{"name": "cut.visual", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 				}

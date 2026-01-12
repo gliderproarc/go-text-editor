@@ -3,6 +3,7 @@ package app
 import (
 	"example.com/texteditor/pkg/buffer"
 	"example.com/texteditor/pkg/search"
+	"strings"
 )
 
 type repeatableChange struct {
@@ -144,10 +145,36 @@ func (r *Runner) textObjectBounds(delim rune, around bool) (start, end int, ok b
 	return start, end, true
 }
 
+func (r *Runner) clearYankState() {
+	r.lastYankValid = false
+	r.lastYankStart = -1
+	r.lastYankEnd = -1
+	r.lastYankCount = 0
+}
+
+func (r *Runner) beginYankTracking() int {
+	r.yankInProgress = true
+	return r.Cursor
+}
+
+func (r *Runner) endYankTracking(start int, count int) {
+	r.yankInProgress = false
+	if count < 1 {
+		count = 1
+	}
+	r.lastYankStart = start
+	r.lastYankEnd = r.Cursor
+	r.lastYankCount = count
+	r.lastYankValid = start >= 0 && r.lastYankEnd >= start
+}
+
 // insertText inserts text at the current cursor, records history, and updates state.
 func (r *Runner) insertText(text string) {
 	if text == "" {
 		return
+	}
+	if !r.yankInProgress {
+		r.clearYankState()
 	}
 	r.captureInsertText(text)
 	_ = r.Buf.Insert(r.Cursor, []rune(text))
@@ -241,7 +268,7 @@ func (r *Runner) deleteLines(count int) {
 	}
 	text := string(r.Buf.Slice(start, end))
 	_ = r.deleteRange(start, end, text)
-	r.KillRing.Set(text)
+	r.KillRing.Push(text)
 	r.recomputeCursorLine()
 	if r.Logger != nil {
 		r.Logger.Event("action", map[string]any{"name": "delete.line", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
@@ -266,7 +293,7 @@ func (r *Runner) deleteChars(count int) {
 	}
 	text := string(r.Buf.Slice(start, end))
 	_ = r.deleteRange(start, end, text)
-	r.KillRing.Set(text)
+	r.KillRing.Push(text)
 	if r.Logger != nil {
 		r.Logger.Event("action", map[string]any{"name": "cut.normal", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 	}
@@ -290,7 +317,7 @@ func (r *Runner) deleteWords(count int) string {
 	}
 	text := string(r.Buf.Slice(start, end))
 	_ = r.deleteRange(start, end, text)
-	r.KillRing.Set(text)
+	r.KillRing.Push(text)
 	r.recomputeCursorLine()
 	if r.Logger != nil {
 		r.Logger.Event("action", map[string]any{"name": "delete.word", "text": text, "count": count, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
@@ -323,13 +350,14 @@ func (r *Runner) yankTextObject(delim rune, around bool, count int) {
 	if count < 1 {
 		count = 1
 	}
+	r.clearYankState()
 	for i := 0; i < count; i++ {
 		start, end, ok := r.textObjectBounds(delim, around)
 		if !ok {
 			return
 		}
 		text := string(r.Buf.Slice(start, end))
-		r.KillRing.Set(text)
+		r.KillRing.Push(text)
 		if r.Logger != nil {
 			r.Logger.Event("action", map[string]any{"name": "yank.textobject", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
 		}
@@ -347,7 +375,7 @@ func (r *Runner) deleteTextObject(delim rune, around bool, count int) {
 		}
 		text := string(r.Buf.Slice(start, end))
 		_ = r.deleteRange(start, end, text)
-		r.KillRing.Set(text)
+		r.KillRing.Push(text)
 		r.recomputeCursorLine()
 		if r.Logger != nil {
 			r.Logger.Event("action", map[string]any{"name": "delete.textobject", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
@@ -394,6 +422,9 @@ func (r *Runner) deleteRange(start, end int, text string) error {
 	if start >= end {
 		return nil
 	}
+	if !r.yankInProgress {
+		r.clearYankState()
+	}
 	// remember original cursor to decide line adjustments
 	origCursor := r.Cursor
 	if err := r.Buf.Delete(start, end); err != nil {
@@ -426,6 +457,94 @@ func (r *Runner) deleteRange(start, end int, text string) error {
 	// Mark buffer content changed for spell re-check coalescing
 	r.editSeq++
 	return nil
+}
+
+func (r *Runner) killRingPreview(text string) string {
+	if text == "" {
+		return "(empty)"
+	}
+	flat := strings.ReplaceAll(text, "\n", "\\n")
+	flat = strings.ReplaceAll(flat, "\t", "\\t")
+	max := 60
+	if len([]rune(flat)) > max {
+		runes := []rune(flat)
+		flat = string(runes[:max]) + "…"
+	}
+	return flat
+}
+
+func (r *Runner) showKillRingStatus() {
+	if !r.KillRing.HasData() {
+		r.showDialog("Kill ring is empty")
+		return
+	}
+	current := r.killRingPreview(r.KillRing.Current())
+	next := r.KillRing.Next()
+	if next == "" {
+		next = "(no alternate)"
+	} else {
+		next = r.killRingPreview(next)
+	}
+	r.showDialogLines([]string{
+		"Kill ring:",
+		" current: " + current,
+		" next: " + next,
+	})
+}
+
+func (r *Runner) yankPop() {
+	if r.Buf == nil {
+		return
+	}
+	if !r.lastYankValid {
+		if !r.KillRing.Rotate() {
+			r.showDialog("Kill ring has no alternate entries")
+			return
+		}
+		if r.Logger != nil {
+			r.Logger.Event("action", map[string]any{"name": "yank.pop.select", "text": r.KillRing.Get(), "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+		}
+		if r.Screen != nil {
+			r.draw(nil)
+		}
+		r.showKillRingStatus()
+		return
+	}
+	if !r.KillRing.Rotate() {
+		r.showDialog("Kill ring has no alternate entries")
+		return
+	}
+	start := r.lastYankStart
+	end := r.lastYankEnd
+	count := r.lastYankCount
+	if count < 1 {
+		count = 1
+	}
+	if start < 0 || end < start || end > r.Buf.Len() {
+		r.clearYankState()
+		r.showDialog("Unable to cycle yank")
+		return
+	}
+	r.yankInProgress = true
+	r.Cursor = start
+	removed := string(r.Buf.Slice(start, end))
+	_ = r.deleteRange(start, end, removed)
+	text := r.KillRing.Get()
+	for i := 0; i < count; i++ {
+		r.insertText(text)
+	}
+	r.yankInProgress = false
+	r.lastYankStart = start
+	r.lastYankEnd = r.Cursor
+	r.lastYankCount = count
+	r.lastYankValid = true
+	if r.Logger != nil {
+		r.Logger.Event("action", map[string]any{"name": "yank.pop", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
+	}
+	if r.Screen != nil {
+		r.draw(nil)
+	}
+	r.showKillRingStatus()
 }
 
 // moveCursorVertical moves the cursor up or down by delta lines, preserving the column when possible.

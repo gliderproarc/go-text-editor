@@ -390,7 +390,7 @@ func TestVisualHalfPageMovement(t *testing.T) {
 	if r.Mode != ModeVisual || r.VisualStart != start {
 		t.Fatalf("expected to remain in visual mode after Ctrl+D")
 	}
-	r.KillRing.Set("ZZ")
+	r.KillRing.Push("ZZ")
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlU, 0, 0))
 	if r.CursorLine != 0 {
 		t.Fatalf("expected cursor line 0 after Ctrl+U, got %d", r.CursorLine)
@@ -593,7 +593,7 @@ func TestRunner_VisualCutWord(t *testing.T) {
 
 func TestRunner_NormalPaste(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), Cursor: 1, History: history.New()}
-	r.KillRing.Set("XY")
+	r.KillRing.Push("XY")
 	// Paste at cursor in normal mode
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'p', 0))
 	if got := r.Buf.String(); got != "heXYllo" {
@@ -612,7 +612,7 @@ func TestRunner_NormalPaste(t *testing.T) {
 
 func TestRunner_PasteBefore(t *testing.T) {
 	r := &Runner{Buf: buffer.NewGapBufferFromString("hello"), Cursor: 2, History: history.New()}
-	r.KillRing.Set("XY")
+	r.KillRing.Push("XY")
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'P', 0))
 	if got := r.Buf.String(); got != "heXYllo" {
 		t.Fatalf("expected buffer 'heXYllo' after paste-before, got %q", got)
