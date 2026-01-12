@@ -55,7 +55,7 @@ func (r *Runner) commandList() []command {
 		{name: "spell: check word", action: func() bool { r.CheckWordAtCursor(); return false }},
 		{name: "theme: next", action: func() bool { r.NextTheme(); return false }},
 		{name: "theme: previous", action: func() bool { r.PrevTheme(); return false }},
-		{name: "clipboard: cycle", action: func() bool { r.yankPop(); return false }},
+		{name: "clipboard: cycle", action: func() bool { r.runKillRingCycle(); return false }},
 		{name: "search", action: func() bool { r.runSearchPrompt(); return false }},
 		{name: "go to line", action: func() bool { r.runGoToPrompt(); return false }},
 		{name: "help", action: func() bool { r.ShowHelp = true; r.draw(nil); return false }},
