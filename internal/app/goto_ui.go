@@ -21,7 +21,7 @@ func (r *Runner) runGoToPrompt() {
 		ev := r.waitEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
-			if ev.Key() == tcell.KeyEsc {
+			if r.isCancelKey(ev) {
 				r.clearMiniBuffer()
 				r.draw(nil)
 				return

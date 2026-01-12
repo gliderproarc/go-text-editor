@@ -36,6 +36,28 @@ func (k *KillRing) Rotate() bool {
 	return true
 }
 
+// RotatePrev moves to the previous entry in the ring.
+func (k *KillRing) RotatePrev() bool {
+	if len(k.entries) <= 1 {
+		return false
+	}
+	k.pos = (k.pos - 1 + len(k.entries)) % len(k.entries)
+	return true
+}
+
+// EntriesFromCurrent returns entries starting at current position.
+func (k *KillRing) EntriesFromCurrent() []string {
+	if len(k.entries) == 0 {
+		return nil
+	}
+	out := make([]string, len(k.entries))
+	for i := range k.entries {
+		idx := (k.pos + i) % len(k.entries)
+		out[i] = k.entries[idx]
+	}
+	return out
+}
+
 // Current returns the current killed text.
 func (k *KillRing) Current() string {
 	if len(k.entries) == 0 {

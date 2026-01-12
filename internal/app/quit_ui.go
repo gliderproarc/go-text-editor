@@ -14,7 +14,7 @@ func (r *Runner) runQuitPrompt() bool {
 		ev := r.waitEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
-			if ev.Key() == tcell.KeyEsc || (ev.Key() == tcell.KeyRune && (ev.Rune() == 'n' || ev.Rune() == 'N')) {
+			if r.isCancelKey(ev) || (ev.Key() == tcell.KeyRune && (ev.Rune() == 'n' || ev.Rune() == 'N')) {
 				r.clearMiniBuffer()
 				r.draw(nil)
 				return false

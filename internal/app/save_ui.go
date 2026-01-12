@@ -16,7 +16,7 @@ func (r *Runner) SaveAs(path string) error {
 }
 
 // runSaveAsPrompt prompts for a file path and saves the current buffer there.
-// Esc cancels; Enter attempts to write. Overwrites existing files.
+// Esc or Ctrl+G cancels; Enter attempts to write. Overwrites existing files.
 func (r *Runner) runSaveAsPrompt() {
 	if r.Screen == nil {
 		return
@@ -28,7 +28,7 @@ func (r *Runner) runSaveAsPrompt() {
 		if errMsg != "" {
 			lines = append(lines, errMsg)
 		} else {
-			lines = append(lines, "Enter to save, Esc to cancel")
+			lines = append(lines, "Enter to save, Esc/Ctrl+G to cancel")
 		}
 		r.setMiniBuffer(lines)
 		r.draw(nil)
@@ -36,7 +36,7 @@ func (r *Runner) runSaveAsPrompt() {
 		ev := r.waitEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
-			if ev.Key() == tcell.KeyEsc {
+			if r.isCancelKey(ev) {
 				r.clearMiniBuffer()
 				r.draw(nil)
 				return

@@ -1,10 +1,10 @@
 package app
 
 import (
-    "fmt"
-    "os"
+	"fmt"
+	"os"
 
-    "github.com/gdamore/tcell/v2"
+	"github.com/gdamore/tcell/v2"
 )
 
 type mnemonicNode struct {
@@ -15,78 +15,97 @@ type mnemonicNode struct {
 }
 
 func (r *Runner) mnemonicMenu() []*mnemonicNode {
-    return []*mnemonicNode{
-        {
-            key:  'f',
-            name: "file",
-            children: []*mnemonicNode{
-                {key: 'o', name: "open file", action: func() bool {
-                    r.runOpenPrompt()
-                    return false
-                }},
-                {key: 's', name: "save", action: func() bool {
-                    if r.FilePath == "" {
-                        r.runSaveAsPrompt()
-                    } else {
-                        if err := r.Save(); err == nil {
-                            r.showDialog("Saved " + r.FilePath)
-                        }
-                    }
-                    if r.Logger != nil {
-                        r.Logger.Event("action", map[string]any{"name": "save", "file": r.FilePath})
-                    }
-                    return false
-                }},
-            },
-        },
-        {
-            key:  'p',
-            name: "spell",
-            children: []*mnemonicNode{
-                {key: 't', name: "toggle", action: func() bool {
-                    if r.Spell != nil && r.Spell.Enabled {
-                        r.DisableSpellCheck()
-                        r.showDialog("Spell checking disabled")
-                        return false
-                    }
-                    cmd := os.Getenv("TEXTEDITOR_SPELL")
-                    var err error
-                    if cmd != "" {
-                        err = r.EnableSpellCheck(cmd)
-                    } else {
-                        if err = r.EnableSpellCheck("./aspellbridge"); err != nil {
-                            err = r.EnableSpellCheck("./spellmock")
-                        }
-                    }
-                    if err != nil {
-                        r.showDialog("Spell enable failed: " + err.Error())
-                    } else {
-                        r.showDialog("Spell checking enabled")
-                    }
-                    return false
-                }},
-                {key: 'r', name: "recheck", action: func() bool { r.updateSpellAsync(); return false }},
-                {key: 'c', name: "check word", action: func() bool { r.CheckWordAtCursor(); return false }},
-            },
-        },
-        {
-            key:  't',
-            name: "theme",
-            children: []*mnemonicNode{
-                {key: 'n', name: "next", action: func() bool { r.NextTheme(); return false }},
-                {key: 'p', name: "previous", action: func() bool { r.PrevTheme(); return false }},
-            },
-        },
-        {
-            key:  's',
-            name: "search",
-            children: []*mnemonicNode{
-                {key: 's', name: "search", action: func() bool {
-                    r.runSearchPrompt()
-                    return false
-                }},
-            },
-        },
+	return []*mnemonicNode{
+		{
+			key:  'f',
+			name: "file",
+			children: []*mnemonicNode{
+				{key: 'o', name: "open file", action: func() bool {
+					r.runOpenPrompt()
+					return false
+				}},
+				{key: 's', name: "save", action: func() bool {
+					if r.FilePath == "" {
+						r.runSaveAsPrompt()
+					} else {
+						if err := r.Save(); err == nil {
+							r.showDialog("Saved " + r.FilePath)
+						}
+					}
+					if r.Logger != nil {
+						r.Logger.Event("action", map[string]any{"name": "save", "file": r.FilePath})
+					}
+					return false
+				}},
+				{key: 'a', name: "save as", action: func() bool {
+					r.runSaveAsPrompt()
+					return false
+				}},
+			},
+		},
+		{
+			key:  'p',
+			name: "spell",
+			children: []*mnemonicNode{
+				{key: 't', name: "toggle", action: func() bool {
+					if r.Spell != nil && r.Spell.Enabled {
+						r.DisableSpellCheck()
+						r.showDialog("Spell checking disabled")
+						return false
+					}
+					cmd := os.Getenv("TEXTEDITOR_SPELL")
+					var err error
+					if cmd != "" {
+						err = r.EnableSpellCheck(cmd)
+					} else {
+						if err = r.EnableSpellCheck("./aspellbridge"); err != nil {
+							err = r.EnableSpellCheck("./spellmock")
+						}
+					}
+					if err != nil {
+						r.showDialog("Spell enable failed: " + err.Error())
+					} else {
+						r.showDialog("Spell checking enabled")
+					}
+					return false
+				}},
+				{key: 'r', name: "recheck", action: func() bool { r.updateSpellAsync(); return false }},
+				{key: 'c', name: "check word", action: func() bool { r.CheckWordAtCursor(); return false }},
+			},
+		},
+		{
+			key:  't',
+			name: "theme",
+			children: []*mnemonicNode{
+				{key: 'n', name: "next", action: func() bool { r.NextTheme(); return false }},
+				{key: 'p', name: "previous", action: func() bool { r.PrevTheme(); return false }},
+			},
+		},
+		{
+			key:  'c',
+			name: "clipboard",
+			children: []*mnemonicNode{
+				{key: 'c', name: "cycle kill ring", action: func() bool { r.runKillRingCycle(); return false }},
+			},
+		},
+		{
+			key:  'm',
+			name: "menu",
+			children: []*mnemonicNode{
+				{key: 'c', name: "command menu", action: func() bool { return r.runCommandMenu() }},
+			},
+		},
+
+		{
+			key:  's',
+			name: "search",
+			children: []*mnemonicNode{
+				{key: 's', name: "search", action: func() bool {
+					r.runSearchPrompt()
+					return false
+				}},
+			},
+		},
 		{
 			key:  'g',
 			name: "go to",
@@ -97,8 +116,8 @@ func (r *Runner) mnemonicMenu() []*mnemonicNode {
 				}},
 			},
 		},
-		{key: 'h', name: "help", action: func() bool {
-			r.ShowHelp = true
+		{key: 'h', name: "toggle help", action: func() bool {
+			r.ShowHelp = !r.ShowHelp
 			r.draw(nil)
 			return false
 		}},
@@ -112,13 +131,13 @@ func (r *Runner) mnemonicMenu() []*mnemonicNode {
 }
 
 func (r *Runner) runMnemonicMenu() bool {
-    if r.Screen == nil {
-        return false
-    }
-    // Show menu overlay so status bar displays <M>
-    r.Overlay = OverlayMenu
-    defer func() { r.Overlay = OverlayNone }()
-    root := &mnemonicNode{children: r.mnemonicMenu()}
+	if r.Screen == nil {
+		return false
+	}
+	// Show menu overlay so status bar displays <M>
+	r.Overlay = OverlayMenu
+	defer func() { r.Overlay = OverlayNone }()
+	root := &mnemonicNode{children: r.mnemonicMenu()}
 	node := root
 	path := ""
 	for {
@@ -137,7 +156,7 @@ func (r *Runner) runMnemonicMenu() bool {
 		}
 		if kev, ok := ev.(*tcell.EventKey); ok {
 			switch {
-			case kev.Key() == tcell.KeyEsc:
+			case r.isCancelKey(kev):
 				r.clearMiniBuffer()
 				r.draw(nil)
 				return false

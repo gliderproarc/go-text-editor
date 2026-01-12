@@ -185,17 +185,17 @@ func TestModeTransitions(t *testing.T) {
 	if r.Mode != ModeInsert {
 		t.Fatalf("expected mode insert after 'i'")
 	}
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlG, 0, 0))
 	if r.Mode != ModeNormal {
-		t.Fatalf("expected mode normal after Esc")
+		t.Fatalf("expected mode normal after Ctrl+G")
 	}
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'v', 0))
 	if r.Mode != ModeVisual {
 		t.Fatalf("expected mode visual after 'v'")
 	}
-	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlG, 0, 0))
 	if r.Mode != ModeNormal {
-		t.Fatalf("expected mode normal after Esc from visual")
+		t.Fatalf("expected mode normal after Ctrl+G from visual")
 	}
 }
 

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 
 	"example.com/texteditor/pkg/buffer"
@@ -475,31 +476,69 @@ func (r *Runner) killRingPreview(text string) string {
 	return flat
 }
 
-func (r *Runner) showKillRingStatus() {
+func (r *Runner) killRingStatusLines() []string {
 	if !r.KillRing.HasData() {
-		r.showDialog("Kill ring is empty")
-		return
+		return []string{"Kill ring is empty"}
 	}
-	current := r.killRingPreview(r.KillRing.Current())
-	next := r.KillRing.Next()
-	if next == "" {
-		next = "(no alternate)"
-	} else {
-		next = r.killRingPreview(next)
+	lines := []string{
+		"Kill ring (Esc/Ctrl+G or Enter to accept)",
+		"Use Ctrl+N/P or arrows to cycle",
 	}
-	r.showDialogLines([]string{
-		"Kill ring:",
-		" current: " + current,
-		" next: " + next,
-	})
+	entries := r.KillRing.EntriesFromCurrent()
+	width := 0
+	height := 0
+	if r.Screen != nil {
+		width, height = r.Screen.Size()
+	}
+	maxEntries := len(entries)
+	if height > 0 {
+		maxEntries = height - len(lines) - 1
+	}
+	if maxEntries < 1 {
+		maxEntries = 1
+	}
+	if maxEntries > len(entries) {
+		maxEntries = len(entries)
+	}
+	for i := 0; i < maxEntries; i++ {
+		prefix := "  "
+		if i == 0 {
+			prefix = "> "
+		}
+		entry := prefix + r.killRingPreview(entries[i])
+		if width > 0 {
+			runes := []rune(entry)
+			if len(runes) > width {
+				entry = string(runes[:width])
+			}
+		}
+		lines = append(lines, entry)
+	}
+	if len(entries) > maxEntries {
+		lines = append(lines, fmt.Sprintf("  … and %d more", len(entries)-maxEntries))
+	}
+	return lines
 }
 
-func (r *Runner) yankPop() {
+func (r *Runner) showKillRingStatus() {
+	if r.Screen == nil {
+		return
+	}
+	lines := r.killRingStatusLines()
+	r.setMiniBuffer(lines)
+	r.draw(nil)
+}
+
+func (r *Runner) yankPop(direction int) {
 	if r.Buf == nil {
 		return
 	}
+	rotate := r.KillRing.Rotate
+	if direction < 0 {
+		rotate = r.KillRing.RotatePrev
+	}
 	if !r.lastYankValid {
-		if !r.KillRing.Rotate() {
+		if !rotate() {
 			r.showDialog("Kill ring has no alternate entries")
 			return
 		}
@@ -512,7 +551,7 @@ func (r *Runner) yankPop() {
 		r.showKillRingStatus()
 		return
 	}
-	if !r.KillRing.Rotate() {
+	if !rotate() {
 		r.showDialog("Kill ring has no alternate entries")
 		return
 	}
@@ -554,10 +593,14 @@ func (r *Runner) runKillRingCycle() {
 		r.showDialog("Kill ring is empty")
 		return
 	}
-	r.yankPop()
 	if r.Screen == nil {
 		return
 	}
+	defer func() {
+		r.clearMiniBuffer()
+		r.draw(nil)
+	}()
+	r.yankPop(1)
 	for {
 		ev := r.waitEvent()
 		if ev == nil {
@@ -568,12 +611,16 @@ func (r *Runner) runKillRingCycle() {
 			continue
 		}
 		switch {
-		case kev.Key() == tcell.KeyEsc || kev.Key() == tcell.KeyEnter:
+		case r.isCancelKey(kev) || kev.Key() == tcell.KeyEnter:
 			return
 		case kev.Key() == tcell.KeyCtrlN || kev.Key() == tcell.KeyDown || kev.Key() == tcell.KeyRight:
-			r.yankPop()
+			r.yankPop(1)
+		case kev.Key() == tcell.KeyCtrlP || kev.Key() == tcell.KeyUp || kev.Key() == tcell.KeyLeft:
+			r.yankPop(-1)
 		case kev.Key() == tcell.KeyRune && kev.Rune() == 'n' && kev.Modifiers() == tcell.ModCtrl:
-			r.yankPop()
+			r.yankPop(1)
+		case kev.Key() == tcell.KeyRune && kev.Rune() == 'p' && kev.Modifiers() == tcell.ModCtrl:
+			r.yankPop(-1)
 		}
 	}
 }

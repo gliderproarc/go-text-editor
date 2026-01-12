@@ -98,4 +98,24 @@ func TestKillRing_Rotate(t *testing.T) {
 	if k.Get() != "one" {
 		t.Fatalf("expected current entry 'one', got %q", k.Get())
 	}
+	if !k.RotatePrev() {
+		t.Fatalf("expected rotate prev to succeed")
+	}
+	if k.Get() != "two" {
+		t.Fatalf("expected current entry 'two' after prev, got %q", k.Get())
+	}
+}
+
+func TestKillRing_EntriesFromCurrent(t *testing.T) {
+	var k KillRing
+	k.Push("one")
+	k.Push("two")
+	k.Push("three")
+	entries := k.EntriesFromCurrent()
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(entries))
+	}
+	if entries[0] != "three" || entries[1] != "two" || entries[2] != "one" {
+		t.Fatalf("unexpected entries order: %v", entries)
+	}
 }

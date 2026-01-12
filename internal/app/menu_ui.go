@@ -127,7 +127,7 @@ func (r *Runner) runCommandMenu() bool {
 		}
 		if kev, ok := ev.(*tcell.EventKey); ok {
 			switch {
-			case kev.Key() == tcell.KeyEsc:
+			case r.isCancelKey(kev):
 				r.clearMiniBuffer()
 				r.draw(nil)
 				return false

@@ -5,7 +5,7 @@ import (
 )
 
 // runOpenPrompt prompts for a file path and loads it into the buffer.
-// Esc cancels; Enter attempts to load. On error, shows a brief message and remains in the prompt.
+// Esc or Ctrl+G cancels; Enter attempts to load. On error, shows a brief message and remains in the prompt.
 func (r *Runner) runOpenPrompt() {
 	if r.Screen == nil {
 		return
@@ -17,7 +17,7 @@ func (r *Runner) runOpenPrompt() {
 		if errMsg != "" {
 			lines = append(lines, errMsg)
 		} else {
-			lines = append(lines, "Enter to open, Esc to cancel")
+			lines = append(lines, "Enter to open, Esc/Ctrl+G to cancel")
 		}
 		r.setMiniBuffer(lines)
 		r.draw(nil)
@@ -26,7 +26,7 @@ func (r *Runner) runOpenPrompt() {
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			// Cancel
-			if ev.Key() == tcell.KeyEsc {
+			if r.isCancelKey(ev) {
 				r.clearMiniBuffer()
 				r.draw(nil)
 				return

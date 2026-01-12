@@ -93,6 +93,10 @@ func (r *Runner) clearMiniBuffer() {
 	r.MiniBuf = nil
 }
 
+func (r *Runner) isCancelKey(ev *tcell.EventKey) bool {
+	return ev.Key() == tcell.KeyEsc || ev.Key() == tcell.KeyCtrlG || (ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == tcell.ModCtrl)
+}
+
 // waitEvent returns the next terminal event either from the runner's event
 // channel (if present) or by polling the screen directly. It blocks until an
 // event is available or returns nil if no screen is attached.

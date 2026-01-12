@@ -114,7 +114,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 	}
 	// Mode transitions similar to Vim
-	if ev.Key() == tcell.KeyEsc {
+	if r.isCancelKey(ev) {
 		switch r.Mode {
 		case ModeInsert:
 			r.finalizeInsertCapture()
