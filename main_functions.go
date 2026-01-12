@@ -24,7 +24,7 @@ func drawUI(s tcell.Screen) {
 
 // drawHelp renders a help screen.
 func drawHelp(s tcell.Screen) {
-	width, height := s.Size()
+	_, height := s.Size()
 	s.Clear()
 	s.SetStyle(tcell.StyleDefault)
 	lines := []string{
@@ -44,9 +44,10 @@ func drawHelp(s tcell.Screen) {
 		"- Enter: New line; Backspace/Delete: Remove",
 		"- Typing: Inserts characters",
 	}
+	leftPadding := 4
 	y := (height - len(lines)) / 2
 	for i, line := range lines {
-		x := (width - len(line)) / 2
+		x := leftPadding
 		for j, r := range line {
 			s.SetContent(x+j, y+i, r, nil, tcell.StyleDefault.Foreground(tcell.ColorWhite))
 		}
