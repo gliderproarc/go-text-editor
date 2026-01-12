@@ -1,9 +1,11 @@
 package app
 
 import (
+	"strings"
+
 	"example.com/texteditor/pkg/buffer"
 	"example.com/texteditor/pkg/search"
-	"strings"
+	"github.com/gdamore/tcell/v2"
 )
 
 type repeatableChange struct {
@@ -545,6 +547,35 @@ func (r *Runner) yankPop() {
 		r.draw(nil)
 	}
 	r.showKillRingStatus()
+}
+
+func (r *Runner) runKillRingCycle() {
+	if !r.KillRing.HasData() {
+		r.showDialog("Kill ring is empty")
+		return
+	}
+	r.yankPop()
+	if r.Screen == nil {
+		return
+	}
+	for {
+		ev := r.waitEvent()
+		if ev == nil {
+			return
+		}
+		kev, ok := ev.(*tcell.EventKey)
+		if !ok {
+			continue
+		}
+		switch {
+		case kev.Key() == tcell.KeyEsc || kev.Key() == tcell.KeyEnter:
+			return
+		case kev.Key() == tcell.KeyCtrlN || kev.Key() == tcell.KeyDown || kev.Key() == tcell.KeyRight:
+			r.yankPop()
+		case kev.Key() == tcell.KeyRune && kev.Rune() == 'n' && kev.Modifiers() == tcell.ModCtrl:
+			r.yankPop()
+		}
+	}
 }
 
 // moveCursorVertical moves the cursor up or down by delta lines, preserving the column when possible.
