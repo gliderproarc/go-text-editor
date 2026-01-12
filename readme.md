@@ -518,10 +518,13 @@ MIT (proposed).
 ⸻
 
 16) Future Ideas
-	•	LSP integration as a plugin (stdio), surfacing actions through the contextual menu.
-	•	Macro recording/replay.
-	•	Session persistence & MRU lists.
-	•	Theming and status line customization.
+ 	•	LSP integration as a plugin (stdio), surfacing actions through the contextual menu.
+ 	•	Macro recording/replay.
+ 	•	Session persistence & MRU lists.
+ 	•	Theming and status line customization.
+ 	•	Add kill-ring cycling to the mnemonic menu hierarchy.
+ 	•	Add a kill-ring cycling UI that previews and scrolls entries before swapping.
+
 
 ⸻
 
@@ -539,6 +542,7 @@ nav.left/right/up/down	Move	arrows	always
 search.incremental	Search	Ctrl+W	always
 edit.killLine   Cut to End of Line  Ctrl+K  buffer.isEditable
 edit.yank       Paste   Ctrl+U/Ctrl+Y  killring.hasData
+clipboard.cycle Cycle Kill Ring  (none)  killring.hasData
 history.undo	Undo	Ctrl+Z	history.canUndo
 history.redo	Redo	Ctrl+Y	history.canRedo
 menu.context	Command Menu	F2	always
