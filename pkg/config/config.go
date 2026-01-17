@@ -18,32 +18,33 @@ type Keybinding struct {
 
 // Config holds user configuration values.
 type Config struct {
-    Keymap map[string]Keybinding `yaml:"keymap"`
-    Theme  Theme                 `yaml:"theme"`
+	Keymap map[string]Keybinding `yaml:"keymap"`
+	Theme  Theme                 `yaml:"theme"`
 }
 
 // Default returns a Config with default key mappings.
 func Default() *Config {
-    // Default to the terminal-compliant theme so the editor inherits
-    // the user's terminal colors when no config is provided.
-    return &Config{Keymap: DefaultKeymap(), Theme: TerminalTheme()}
+	// Default to the terminal-compliant theme so the editor inherits
+	// the user's terminal colors when no config is provided.
+	return &Config{Keymap: DefaultKeymap(), Theme: TerminalTheme()}
 }
 
 // DefaultKeymap provides builtin command bindings.
 func DefaultKeymap() map[string]Keybinding {
 	return map[string]Keybinding{
-		"quit":   mustParse("Ctrl+Q"),
-		"save":   mustParse("Ctrl+S"),
-		"search": mustParse("Ctrl+W"),
-		"menu":   mustParse("Ctrl+T"),
+		"quit":       mustParse("Ctrl+Q"),
+		"save":       mustParse("Ctrl+S"),
+		"search":     mustParse("Ctrl+W"),
+		"multi-edit": mustParse("Ctrl+L"),
+		"menu":       mustParse("Ctrl+T"),
 	}
 }
 
 // Load loads configuration from the provided path. If the file does not
 // exist, defaults are returned.
 func Load(path string) (*Config, error) {
-    cfg := Default()
-    data, err := os.ReadFile(path)
+	cfg := Default()
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return cfg, nil
@@ -51,113 +52,113 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 	lines := strings.Split(string(data), "\n")
-    inKeymap := false
-    inTheme := false
-    // allow "theme" block with flat keys like "ui.background: black"
-    // and "syntax.<group>: <color>" as well as "preset: <name>"
-    for _, line := range lines {
-        line = strings.TrimSpace(line)
-        if line == "" || strings.HasPrefix(line, "#") {
-            continue
-        }
-        // section entry
-        if !inKeymap && !inTheme {
-            switch line {
-            case "keymap:":
-                inKeymap = true
-                continue
-            case "theme:":
-                inTheme = true
-                continue
-            default:
-                // ignore unknown top-level for now
-                continue
-            }
-        }
-        parts := strings.SplitN(line, ":", 2)
-        if len(parts) != 2 {
-            return nil, errors.New("invalid config line: " + line)
-        }
-        k := strings.TrimSpace(parts[0])
-        v := strings.TrimSpace(parts[1])
-        if inKeymap {
-            kb, err := ParseKeybinding(v)
-            if err != nil {
-                return nil, err
-            }
-            cfg.Keymap[k] = kb
-            continue
-        }
-        if inTheme {
-            if k == "preset" || k == "name" {
-                // load builtin preset first; then allow overrides below
-                if t, ok := BuiltinThemes[strings.ToLower(v)]; ok {
-                    cfg.Theme = t
-                }
-                continue
-            }
-            if k == "file" || k == "path" || k == "import" {
-                full := v
-                if !filepath.IsAbs(full) {
-                    // resolve relative to config file directory
-                    full = filepath.Join(filepath.Dir(path), v)
-                }
-                if t, err := ImportTheme(full); err == nil {
-                    cfg.Theme = t
-                }
-                continue
-            }
-            // route based on known keys and syntax.*
-            switch strings.ToLower(k) {
-            case "ui.background":
-                cfg.Theme.UIBackground = ParseColor(v, cfg.Theme.UIBackground)
-            case "ui.foreground":
-                cfg.Theme.UIForeground = ParseColor(v, cfg.Theme.UIForeground)
-            case "status.bg", "status.background":
-                cfg.Theme.StatusBackground = ParseColor(v, cfg.Theme.StatusBackground)
-            case "status.fg", "status.foreground":
-                cfg.Theme.StatusForeground = ParseColor(v, cfg.Theme.StatusForeground)
-            case "mini.bg", "mini.background":
-                cfg.Theme.MiniBackground = ParseColor(v, cfg.Theme.MiniBackground)
-            case "mini.fg", "mini.foreground":
-                cfg.Theme.MiniForeground = ParseColor(v, cfg.Theme.MiniForeground)
-            case "cursor.text", "cursor.fg", "cursor.foreground":
-                cfg.Theme.CursorText = ParseColor(v, cfg.Theme.CursorText)
-            case "cursor.insert.bg", "cursor.insert.background":
-                cfg.Theme.CursorInsertBG = ParseColor(v, cfg.Theme.CursorInsertBG)
-            case "cursor.normal.bg", "cursor.normal.background":
-                cfg.Theme.CursorNormalBG = ParseColor(v, cfg.Theme.CursorNormalBG)
-            case "cursor.visual.bg", "cursor.visual.background":
-                cfg.Theme.CursorVisualBG = ParseColor(v, cfg.Theme.CursorVisualBG)
-            case "text.default", "text.fg":
-                cfg.Theme.TextDefault = ParseColor(v, cfg.Theme.TextDefault)
-            case "highlight.search.bg":
-                cfg.Theme.HighlightSearchBG = ParseColor(v, cfg.Theme.HighlightSearchBG)
-            case "highlight.search.fg":
-                cfg.Theme.HighlightSearchFG = ParseColor(v, cfg.Theme.HighlightSearchFG)
-            case "highlight.search.current.bg":
-                cfg.Theme.HighlightSearchCurrentBG = ParseColor(v, cfg.Theme.HighlightSearchCurrentBG)
-            case "highlight.search.current.fg":
-                cfg.Theme.HighlightSearchCurrentFG = ParseColor(v, cfg.Theme.HighlightSearchCurrentFG)
-            case "highlight.spell.bg":
-                cfg.Theme.HighlightSpellBG = ParseColor(v, cfg.Theme.HighlightSpellBG)
-            case "highlight.spell.fg":
-                cfg.Theme.HighlightSpellFG = ParseColor(v, cfg.Theme.HighlightSpellFG)
-            case "highlight.spell.underline.fg", "highlight.spell.underline":
-                cfg.Theme.HighlightSpellUnderlineFG = ParseColor(v, cfg.Theme.HighlightSpellUnderlineFG)
-            default:
-                if strings.HasPrefix(strings.ToLower(k), "syntax.") {
-                    group := strings.TrimPrefix(strings.ToLower(k), "syntax.")
-                    if cfg.Theme.SyntaxColors == nil {
-                        cfg.Theme.SyntaxColors = map[string]tcell.Color{}
-                    }
-                    cfg.Theme.SyntaxColors[group] = ParseColor(v, cfg.Theme.SyntaxColors[group])
-                }
-            }
-            continue
-        }
-    }
-    return cfg, nil
+	inKeymap := false
+	inTheme := false
+	// allow "theme" block with flat keys like "ui.background: black"
+	// and "syntax.<group>: <color>" as well as "preset: <name>"
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// section entry
+		if !inKeymap && !inTheme {
+			switch line {
+			case "keymap:":
+				inKeymap = true
+				continue
+			case "theme:":
+				inTheme = true
+				continue
+			default:
+				// ignore unknown top-level for now
+				continue
+			}
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			return nil, errors.New("invalid config line: " + line)
+		}
+		k := strings.TrimSpace(parts[0])
+		v := strings.TrimSpace(parts[1])
+		if inKeymap {
+			kb, err := ParseKeybinding(v)
+			if err != nil {
+				return nil, err
+			}
+			cfg.Keymap[k] = kb
+			continue
+		}
+		if inTheme {
+			if k == "preset" || k == "name" {
+				// load builtin preset first; then allow overrides below
+				if t, ok := BuiltinThemes[strings.ToLower(v)]; ok {
+					cfg.Theme = t
+				}
+				continue
+			}
+			if k == "file" || k == "path" || k == "import" {
+				full := v
+				if !filepath.IsAbs(full) {
+					// resolve relative to config file directory
+					full = filepath.Join(filepath.Dir(path), v)
+				}
+				if t, err := ImportTheme(full); err == nil {
+					cfg.Theme = t
+				}
+				continue
+			}
+			// route based on known keys and syntax.*
+			switch strings.ToLower(k) {
+			case "ui.background":
+				cfg.Theme.UIBackground = ParseColor(v, cfg.Theme.UIBackground)
+			case "ui.foreground":
+				cfg.Theme.UIForeground = ParseColor(v, cfg.Theme.UIForeground)
+			case "status.bg", "status.background":
+				cfg.Theme.StatusBackground = ParseColor(v, cfg.Theme.StatusBackground)
+			case "status.fg", "status.foreground":
+				cfg.Theme.StatusForeground = ParseColor(v, cfg.Theme.StatusForeground)
+			case "mini.bg", "mini.background":
+				cfg.Theme.MiniBackground = ParseColor(v, cfg.Theme.MiniBackground)
+			case "mini.fg", "mini.foreground":
+				cfg.Theme.MiniForeground = ParseColor(v, cfg.Theme.MiniForeground)
+			case "cursor.text", "cursor.fg", "cursor.foreground":
+				cfg.Theme.CursorText = ParseColor(v, cfg.Theme.CursorText)
+			case "cursor.insert.bg", "cursor.insert.background":
+				cfg.Theme.CursorInsertBG = ParseColor(v, cfg.Theme.CursorInsertBG)
+			case "cursor.normal.bg", "cursor.normal.background":
+				cfg.Theme.CursorNormalBG = ParseColor(v, cfg.Theme.CursorNormalBG)
+			case "cursor.visual.bg", "cursor.visual.background":
+				cfg.Theme.CursorVisualBG = ParseColor(v, cfg.Theme.CursorVisualBG)
+			case "text.default", "text.fg":
+				cfg.Theme.TextDefault = ParseColor(v, cfg.Theme.TextDefault)
+			case "highlight.search.bg":
+				cfg.Theme.HighlightSearchBG = ParseColor(v, cfg.Theme.HighlightSearchBG)
+			case "highlight.search.fg":
+				cfg.Theme.HighlightSearchFG = ParseColor(v, cfg.Theme.HighlightSearchFG)
+			case "highlight.search.current.bg":
+				cfg.Theme.HighlightSearchCurrentBG = ParseColor(v, cfg.Theme.HighlightSearchCurrentBG)
+			case "highlight.search.current.fg":
+				cfg.Theme.HighlightSearchCurrentFG = ParseColor(v, cfg.Theme.HighlightSearchCurrentFG)
+			case "highlight.spell.bg":
+				cfg.Theme.HighlightSpellBG = ParseColor(v, cfg.Theme.HighlightSpellBG)
+			case "highlight.spell.fg":
+				cfg.Theme.HighlightSpellFG = ParseColor(v, cfg.Theme.HighlightSpellFG)
+			case "highlight.spell.underline.fg", "highlight.spell.underline":
+				cfg.Theme.HighlightSpellUnderlineFG = ParseColor(v, cfg.Theme.HighlightSpellUnderlineFG)
+			default:
+				if strings.HasPrefix(strings.ToLower(k), "syntax.") {
+					group := strings.TrimPrefix(strings.ToLower(k), "syntax.")
+					if cfg.Theme.SyntaxColors == nil {
+						cfg.Theme.SyntaxColors = map[string]tcell.Color{}
+					}
+					cfg.Theme.SyntaxColors[group] = ParseColor(v, cfg.Theme.SyntaxColors[group])
+				}
+			}
+			continue
+		}
+	}
+	return cfg, nil
 }
 
 // LoadDefault attempts to read ~/.texteditor/config.yaml.

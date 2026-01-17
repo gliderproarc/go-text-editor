@@ -9,6 +9,12 @@
 # Logs
 *.log
 
+# OS files
+.DS_Store
+
+# Local tool state
+/.opencode/
+
 # Local test file
 /textText.txt
 testText.txt
