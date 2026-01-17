@@ -59,6 +59,9 @@ func (r *Runner) commandList() []command {
 		{name: "multi-edit", action: func() bool { r.toggleMultiEdit(); return false }},
 		{name: "search", action: func() bool { r.runSearchPrompt(); return false }},
 		{name: "go to line", action: func() bool { r.runGoToPrompt(); return false }},
+		{name: "macro: record", action: r.maybeMacroMenuAction(func() bool { r.startMacroRecording(""); r.draw(nil); return false })},
+		{name: "macro: stop", action: r.maybeMacroMenuAction(func() bool { r.stopMacroRecording(); r.draw(nil); return false })},
+		{name: "macro: play", action: r.maybeMacroMenuAction(func() bool { r.beginMacroPlayback(""); r.draw(nil); return false })},
 		{name: "help", action: func() bool { r.ShowHelp = true; r.draw(nil); return false }},
 		{name: "quit", action: func() bool {
 			if r.Dirty {
@@ -133,11 +136,14 @@ func (r *Runner) runCommandMenu() bool {
 				r.draw(nil)
 				return false
 			case kev.Key() == tcell.KeyEnter:
-				r.clearMiniBuffer()
-				r.draw(nil)
 				if len(filtered) > 0 {
+					r.clearMiniBuffer()
+					r.Overlay = OverlayNone
 					return filtered[sel].action()
 				}
+				r.clearMiniBuffer()
+				r.Overlay = OverlayNone
+				r.draw(nil)
 				return false
 			case kev.Key() == tcell.KeyBackspace || kev.Key() == tcell.KeyBackspace2:
 				if len(query) > 0 {

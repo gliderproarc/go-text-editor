@@ -1,13 +1,13 @@
 package app
 
 import (
-    "strings"
-    "testing"
+	"strings"
+	"testing"
 
-    "example.com/texteditor/pkg/buffer"
-    "example.com/texteditor/pkg/config"
-    "example.com/texteditor/pkg/search"
-    "github.com/gdamore/tcell/v2"
+	"example.com/texteditor/pkg/buffer"
+	"example.com/texteditor/pkg/config"
+	"example.com/texteditor/pkg/search"
+	"github.com/gdamore/tcell/v2"
 )
 
 func TestDrawFile_Highlights(t *testing.T) {
@@ -23,8 +23,8 @@ func TestDrawFile_Highlights(t *testing.T) {
 	// compute highlights for "hello"
 	ranges := search.SearchAll(text, "hello")
 
-    // draw with highlights
-    drawFile(s, "f.txt", lines, ranges, -1, false, ModeInsert, OverlayNone, 0, nil, config.DefaultTheme())
+	// draw with highlights
+	drawFile(s, "f.txt", lines, ranges, -1, false, ModeInsert, OverlayNone, 0, nil, config.DefaultTheme(), "")
 
 	// check first line "hello" at (0,0..4) is highlighted
 	for x := 0; x < 5; x++ {
@@ -59,7 +59,7 @@ func TestDrawBuffer_DirtyIndicator(t *testing.T) {
 	defer s.Fini()
 
 	buf := buffer.NewGapBufferFromString("hello")
-    drawBuffer(s, buf, "f.txt", nil, 0, true, ModeInsert, OverlayNone, 0, nil, config.DefaultTheme())
+	drawBuffer(s, buf, "f.txt", nil, 0, true, ModeInsert, OverlayNone, 0, nil, config.DefaultTheme(), "")
 
 	_, height := s.Size()
 	expected := "<I>  f.txt [+] — Press Ctrl+Q to exit"
@@ -80,7 +80,7 @@ func TestDrawBuffer_MiniBuffer(t *testing.T) {
 
 	buf := buffer.NewGapBufferFromString("hello")
 	mini := []string{"mini", "buffer"}
-    drawBuffer(s, buf, "f.txt", nil, 0, false, ModeInsert, OverlayNone, 0, mini, config.DefaultTheme())
+	drawBuffer(s, buf, "f.txt", nil, 0, false, ModeInsert, OverlayNone, 0, mini, config.DefaultTheme(), "")
 
 	_, height := s.Size()
 	for i, line := range mini {
@@ -93,6 +93,46 @@ func TestDrawBuffer_MiniBuffer(t *testing.T) {
 	}
 }
 
+func TestDrawFile_MacroStatusLine(t *testing.T) {
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("initializing simulation screen failed: %v", err)
+	}
+	defer s.Fini()
+	s.SetSize(40, 6)
+
+	lines := []string{"hello"}
+	macroStatus := "Recording macro @a"
+	drawFile(s, "f.txt", lines, nil, -1, false, ModeNormal, OverlayNone, 0, nil, config.DefaultTheme(), macroStatus)
+
+	_, height := s.Size()
+	for i, r := range macroStatus {
+		cr, _, _, _ := s.GetContent(i, height-1)
+		if cr != r {
+			t.Fatalf("expected macro status %q at %d, got %q", string(r), i, string(cr))
+		}
+	}
+}
+
+func TestRunner_MacroStatusSnapshot(t *testing.T) {
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("initializing simulation screen failed: %v", err)
+	}
+	defer s.Fini()
+	s.SetSize(40, 6)
+
+	r := New()
+	r.Screen = s
+	r.Buf = buffer.NewGapBufferFromString("hello")
+	r.startMacroRecording("a")
+
+	st := r.renderSnapshot(nil)
+	if st.macroStatus != "Recording macro @a" {
+		t.Fatalf("expected macro status in snapshot, got %q", st.macroStatus)
+	}
+}
+
 // TestDrawFile_Viewport ensures that topLine offsets the rendered lines.
 func TestDrawFile_Viewport(t *testing.T) {
 	s := tcell.NewSimulationScreen("UTF-8")
@@ -102,7 +142,8 @@ func TestDrawFile_Viewport(t *testing.T) {
 	defer s.Fini()
 
 	lines := []string{"l1", "l2", "l3"}
-    drawFile(s, "f.txt", lines, nil, -1, false, ModeInsert, OverlayNone, 1, nil, config.DefaultTheme())
+	drawFile(s, "f.txt", lines, nil, -1, false, ModeInsert, OverlayNone, 1, nil, config.DefaultTheme(), "")
+
 	cr, _, _, _ := s.GetContent(0, 0)
 	if cr != 'l' {
 		t.Fatalf("expected 'l' at (0,0) got %q", string(cr))

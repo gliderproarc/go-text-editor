@@ -9,22 +9,23 @@ import (
 
 // renderState captures a snapshot of editor state for the renderer goroutine.
 type renderState struct {
-	lines      []string
-	filePath   string
-	cursor     int
-	dirty      bool
-	mode       Mode
-	overlay    Overlay
-	topLine    int
-	miniBuf    []string
-	highlights []search.Range
-	showHelp   bool
-	bufLen     int
-	theme      config.Theme
+	lines       []string
+	filePath    string
+	cursor      int
+	dirty       bool
+	mode        Mode
+	overlay     Overlay
+	macroStatus string
+	topLine     int
+	miniBuf     []string
+	highlights  []search.Range
+	showHelp    bool
+	bufLen      int
+	theme       config.Theme
 }
 
 // Minimal UI helpers (kept here so runner does not depend on package main)
-func drawUI(s tcell.Screen, th config.Theme) {
+func drawUI(s tcell.Screen, th config.Theme, macroStatus string) {
 	width, height := s.Size()
 	msg := "TextEditor: No File"
 	msgX := (width - len(msg)) / 2
@@ -34,9 +35,24 @@ func drawUI(s tcell.Screen, th config.Theme) {
 	}
 	status := "Press Ctrl+Q to exit"
 	sbX := (width - len(status)) / 2
-	sbY := height - 1
+	statusRow := height - 1
+	if macroStatus != "" {
+		statusRow = height - 2
+	}
 	for i, r := range status {
-		s.SetContent(sbX+i, sbY, r, nil, tcell.StyleDefault.Foreground(th.StatusForeground).Background(th.StatusBackground))
+		s.SetContent(sbX+i, statusRow, r, nil, tcell.StyleDefault.Foreground(th.StatusForeground).Background(th.StatusBackground))
+	}
+	if macroStatus != "" {
+		macroLine := macroStatus
+		if len(macroLine) > width {
+			macroLine = string([]rune(macroLine)[:width])
+		}
+		for i, r := range macroLine {
+			s.SetContent(i, height-1, r, nil, tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground))
+		}
+		for i := len([]rune(macroLine)); i < width; i++ {
+			s.SetContent(i, height-1, ' ', nil, tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground))
+		}
 	}
 	s.Show()
 }
@@ -53,11 +69,13 @@ func drawHelp(s tcell.Screen, th config.Theme) {
 		"- Ctrl+O: Open file",
 		"- Ctrl+S: Save (Save As if no file)",
 		"- Ctrl+W: Search",
+		"- Ctrl+L: Multi-edit",
 		"- Alt+G: Go to line",
 		"- Ctrl+K: Cut to end of line",
 		"- Ctrl+U/Ctrl+Y: Paste",
 		"- Ctrl+Z / Ctrl+Y: Undo / Redo",
 		"- Ctrl+A/Ctrl+E: Line start/end (insert)",
+		"- Macros: q{reg} record, q stop, @{reg} play, @@ replay",
 		"- Modes: Normal (default), Insert (i), Visual (v)",
 		"- Normal mode: p paste, a append, dd delete line",
 		"- Visual mode: y copy, x cut, o open line",
@@ -107,12 +125,12 @@ func (r *Runner) showDialogLines(lines []string) {
 	r.draw(nil)
 }
 
-func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool, mode Mode, overlay Overlay, topLine int, minibuf []string, th config.Theme) {
+func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights []search.Range, cursor int, dirty bool, mode Mode, overlay Overlay, topLine int, minibuf []string, th config.Theme, macroStatus string) {
 	if buf == nil {
-		drawFile(s, fname, []string{}, highlights, cursor, dirty, mode, overlay, topLine, minibuf, th)
+		drawFile(s, fname, []string{}, highlights, cursor, dirty, mode, overlay, topLine, minibuf, th, macroStatus)
 		return
 	}
-	drawFile(s, fname, buf.Lines(), highlights, cursor, dirty, mode, overlay, topLine, minibuf, th)
+	drawFile(s, fname, buf.Lines(), highlights, cursor, dirty, mode, overlay, topLine, minibuf, th, macroStatus)
 }
 
 // renderSnapshot captures the current runner state into a renderState.
@@ -124,6 +142,9 @@ func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
 	if vh := r.visualHighlightRange(); len(vh) > 0 {
 		highlights = append(highlights, vh...)
 	}
+	if mh := r.multiEditHighlights(); len(mh) > 0 {
+		highlights = append(highlights, mh...)
+	}
 	if sh := r.syntaxHighlightsCached(); len(sh) > 0 {
 		highlights = append(highlights, sh...)
 	}
@@ -132,6 +153,7 @@ func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
 	}
 	mini := append([]string(nil), r.MiniBuf...)
 	hs := append([]search.Range(nil), highlights...)
+	macroStatus := r.MacroStatus
 	var lines []string
 	bufLen := 0
 	if r.Buf != nil {
@@ -139,18 +161,19 @@ func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
 		bufLen = r.Buf.Len()
 	}
 	return renderState{
-		lines:      lines,
-		filePath:   r.FilePath,
-		cursor:     r.Cursor,
-		dirty:      r.Dirty,
-		mode:       r.Mode,
-		overlay:    r.Overlay,
-		topLine:    r.TopLine,
-		miniBuf:    mini,
-		highlights: hs,
-		showHelp:   r.ShowHelp,
-		bufLen:     bufLen,
-		theme:      r.Theme,
+		lines:       lines,
+		filePath:    r.FilePath,
+		cursor:      r.Cursor,
+		dirty:       r.Dirty,
+		mode:        r.Mode,
+		overlay:     r.Overlay,
+		macroStatus: macroStatus,
+		topLine:     r.TopLine,
+		miniBuf:     mini,
+		highlights:  hs,
+		showHelp:    r.ShowHelp,
+		bufLen:      bufLen,
+		theme:       r.Theme,
 	}
 }
 
@@ -161,9 +184,9 @@ func renderToScreen(s tcell.Screen, st renderState) {
 		return
 	}
 	if st.bufLen > 0 {
-		drawFile(s, st.filePath, st.lines, st.highlights, st.cursor, st.dirty, st.mode, st.overlay, st.topLine, st.miniBuf, st.theme)
+		drawFile(s, st.filePath, st.lines, st.highlights, st.cursor, st.dirty, st.mode, st.overlay, st.topLine, st.miniBuf, st.theme, st.macroStatus)
 	} else {
-		drawUI(s, st.theme)
+		drawUI(s, st.theme, st.macroStatus)
 	}
 }
 
@@ -190,13 +213,17 @@ func (r *Runner) draw(highlights []search.Range) {
 	renderToScreen(r.Screen, snapshot)
 }
 
-func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode, overlay Overlay, topLine int, minibuf []string, th config.Theme) {
+func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.Range, cursor int, dirty bool, mode Mode, overlay Overlay, topLine int, minibuf []string, th config.Theme, macroStatus string) {
 	width, height := s.Size()
 	s.Clear()
 	// set default UI style
 	s.SetStyle(tcell.StyleDefault.Foreground(th.UIForeground).Background(th.UIBackground))
+	statusLineCount := 1
+	if macroStatus != "" {
+		statusLineCount = 2
+	}
 	mbHeight := len(minibuf)
-	maxLines := height - 1 - mbHeight
+	maxLines := height - statusLineCount - mbHeight
 	if maxLines < 0 {
 		maxLines = 0
 	}
@@ -208,7 +235,7 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 	}
 	cursorColor := th.CursorNormalBG
 	switch mode {
-	case ModeInsert:
+	case ModeInsert, ModeMultiEdit:
 		cursorColor = th.CursorInsertBG
 	case ModeVisual:
 		cursorColor = th.CursorVisualBG
@@ -265,10 +292,11 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 							// default background highlight (search/selection)
 							bgHL[ri] = true
 							bgGroup[ri] = "bg.search"
-						case "bg.search", "bg.search.current", "bg.select":
+						case "bg.search", "bg.search.current", "bg.select", "bg.multiedit", "bg.multiedit.current":
 							// explicit background highlight kinds
 							bgHL[ri] = true
 							bgGroup[ri] = h.Group
+
 						case "bg.spell":
 							// Spell-check: visually underline characters (no bg)
 							ulHL[ri] = true
@@ -290,7 +318,7 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 				// choose background color based on bgGroup
 				bg := th.HighlightSearchBG
 				fg := th.HighlightSearchFG
-				if g := bgGroup[j]; g == "bg.search.current" {
+				if g := bgGroup[j]; g == "bg.search.current" || g == "bg.multiedit.current" {
 					bg = th.HighlightSearchCurrentBG
 					fg = th.HighlightSearchCurrentFG
 				} else if g := bgGroup[j]; g == "bg.select" {
@@ -368,6 +396,8 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 			modeTag = "<I>"
 		case ModeVisual:
 			modeTag = "<V>"
+		case ModeMultiEdit:
+			modeTag = "<ME>"
 		default:
 			modeTag = "<N>"
 		}
@@ -387,16 +417,34 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 		// match cursor color for mode
 		modeColor = cursorColor
 	}
+	statusRow := height - 1
+	if macroStatus != "" {
+		statusRow = height - 2
+	}
 	for i, r := range status {
 		style := tcell.StyleDefault.Foreground(th.StatusForeground).Background(th.StatusBackground)
 		if i < len(modeTag) {
 			style = tcell.StyleDefault.Foreground(modeColor).Background(th.StatusBackground).Attributes(tcell.AttrBold)
 		}
-		s.SetContent(i, height-1, r, nil, style)
+		s.SetContent(i, statusRow, r, nil, style)
+	}
+	if macroStatus != "" {
+		macroLine := macroStatus
+		if len(macroLine) > width {
+			macroLine = string([]rune(macroLine)[:width])
+		}
+		for i, r := range macroLine {
+			style := tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground)
+			s.SetContent(i, height-1, r, nil, style)
+		}
+		for i := len([]rune(macroLine)); i < width; i++ {
+			style := tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground)
+			s.SetContent(i, height-1, ' ', nil, style)
+		}
 	}
 	// draw mini-buffer lines just above status bar
 	for i, line := range minibuf {
-		y := height - 1 - mbHeight + i
+		y := height - statusLineCount - mbHeight + i
 		runes := []rune(line)
 		// default style for mini-buffer text
 		defStyle := tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground)

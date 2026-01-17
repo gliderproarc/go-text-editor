@@ -20,6 +20,7 @@ const (
 	ModeNormal Mode = iota
 	ModeInsert
 	ModeVisual
+	ModeMultiEdit
 )
 
 // Overlay represents transient UI states that override status indicator
@@ -74,6 +75,10 @@ type Runner struct {
 	Overlay Overlay
 	// Spell checking subsystem state
 	Spell *SpellState
+	// Macro recording info shown in status bar
+	MacroStatus string
+	// Multi-edit mode state (nil when inactive)
+	MultiEdit *multiEditState
 	// Monotonic edit sequence; increments on any buffer mutation (insert/delete/undo/redo).
 	editSeq int64
 	// Last yank (paste) range for yank-pop.
@@ -83,6 +88,15 @@ type Runner struct {
 	lastYankValid bool
 	// True while performing yank/paste operations to avoid clearing yank state.
 	yankInProgress bool
+	// Macro recording/playback state.
+	macroRegisters      map[string][]macroEvent
+	macroRecording      bool
+	macroRecordRegister string
+	macroPendingRecord  bool
+	macroPendingPlay    bool
+	macroPlayback       []macroEvent
+	macroPlaying        bool
+	macroLastRegister   string
 }
 
 func (r *Runner) setMiniBuffer(lines []string) {
@@ -97,17 +111,35 @@ func (r *Runner) isCancelKey(ev *tcell.EventKey) bool {
 	return ev.Key() == tcell.KeyEsc || ev.Key() == tcell.KeyCtrlG || (ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == tcell.ModCtrl)
 }
 
+func (r *Runner) isInsertMode() bool {
+	return r.Mode == ModeInsert || r.Mode == ModeMultiEdit
+}
+
 // waitEvent returns the next terminal event either from the runner's event
 // channel (if present) or by polling the screen directly. It blocks until an
 // event is available or returns nil if no screen is attached.
 func (r *Runner) waitEvent() tcell.Event {
+	if r.macroPlaying {
+		if ev, ok := r.consumeMacroEvent(); ok {
+			return ev
+		}
+	}
+	var ev tcell.Event
 	if r.EventCh != nil {
-		return <-r.EventCh
+		var ok bool
+		ev, ok = <-r.EventCh
+		if !ok {
+			return nil
+		}
+	} else if r.Screen != nil {
+		ev = r.Screen.PollEvent()
 	}
-	if r.Screen != nil {
-		return r.Screen.PollEvent()
+	if kev, ok := ev.(*tcell.EventKey); ok {
+		if r.shouldRecordMacroEvent(kev) {
+			r.recordMacroEvent(kev)
+		}
 	}
-	return nil
+	return ev
 }
 
 // New creates an empty Runner.
@@ -116,7 +148,18 @@ func New() *Runner {
 	bs := editor.BufferState{Buf: buffer.NewGapBuffer(0)}
 	ed.AddBuffer(bs)
 	// Start with terminal-compliant theme so the app follows terminal colors
-	return &Runner{Buf: bs.Buf, History: history.New(), Mode: ModeNormal, VisualStart: -1, Keymap: config.DefaultKeymap(), Theme: config.TerminalTheme(), Ed: ed, lastYankStart: -1, lastYankEnd: -1}
+	return &Runner{
+		Buf:            bs.Buf,
+		History:        history.New(),
+		Mode:           ModeNormal,
+		VisualStart:    -1,
+		Keymap:         config.DefaultKeymap(),
+		Theme:          config.TerminalTheme(),
+		Ed:             ed,
+		lastYankStart:  -1,
+		lastYankEnd:    -1,
+		macroRegisters: map[string][]macroEvent{},
+	}
 }
 
 // cursorLine returns the current 0-based line index of the cursor.
@@ -323,8 +366,8 @@ func (r *Runner) Run() error {
 	r.draw(nil)
 
 	for {
-		ev, ok := <-r.EventCh
-		if !ok {
+		ev := r.waitEvent()
+		if ev == nil {
 			return nil
 		}
 		switch ev := ev.(type) {

@@ -94,6 +94,9 @@ func (r *Runner) mnemonicMenu() []*mnemonicNode {
 			children: []*mnemonicNode{
 				{key: 'c', name: "command menu", action: func() bool { return r.runCommandMenu() }},
 				{key: 'm', name: "multi-edit", action: func() bool { r.toggleMultiEdit(); return false }},
+				{key: 'r', name: "macro record", action: r.maybeMacroMenuAction(func() bool { r.startMacroRecording(""); r.draw(nil); return false })},
+				{key: 's', name: "macro stop", action: r.maybeMacroMenuAction(func() bool { r.stopMacroRecording(); r.draw(nil); return false })},
+				{key: 'p', name: "macro play", action: r.maybeMacroMenuAction(func() bool { r.beginMacroPlayback(""); r.draw(nil); return false })},
 			},
 		},
 
@@ -163,7 +166,7 @@ func (r *Runner) runMnemonicMenu() bool {
 				return false
 			case kev.Key() == tcell.KeyRune && kev.Rune() == ' ' && kev.Modifiers() == 0:
 				r.clearMiniBuffer()
-				r.draw(nil)
+				r.Overlay = OverlayNone
 				return r.runCommandMenu()
 			case kev.Key() == tcell.KeyRune && kev.Modifiers() == 0:
 				ch := kev.Rune()
@@ -180,7 +183,7 @@ func (r *Runner) runMnemonicMenu() bool {
 						path += string(ch)
 					} else if next.action != nil {
 						r.clearMiniBuffer()
-						r.draw(nil)
+						r.Overlay = OverlayNone
 						return next.action()
 					}
 				}

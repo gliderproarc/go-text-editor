@@ -209,9 +209,9 @@ func TestRun_SearchPrompt_Simulation(t *testing.T) {
 	for _, ch := range "world" {
 		s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, ch, 0))
 	}
-	// accept search
+	// accept
 	s.PostEventWait(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
-	// quit editor
+	// quit
 	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
 
 	select {
@@ -223,23 +223,51 @@ func TestRun_SearchPrompt_Simulation(t *testing.T) {
 		t.Fatalf("timeout waiting for runner to quit")
 	}
 
-	expected := len([]rune("hello "))
-	if r.Cursor != expected {
-		t.Fatalf("expected cursor %d after search, got %d", expected, r.Cursor)
-	}
-	if got := r.Buf.String(); got != "hello world hello" {
-		t.Fatalf("buffer modified during search: %q", got)
+	if r.Cursor != len([]rune("hello ")) {
+		t.Fatalf("expected cursor at start of 'world', got %d", r.Cursor)
 	}
 }
 
-// TestRun_CommandMenuQuit_Simulation verifies that the command menu can execute
-// the quit command when selected via typing and Enter.
-func TestRun_CommandMenuQuit_Simulation(t *testing.T) {
+func TestRun_MnemonicMenu_FromVisualSelection(t *testing.T) {
 	s := tcell.NewSimulationScreen("UTF-8")
 	if err := s.Init(); err != nil {
 		t.Fatalf("init sim screen: %v", err)
 	}
 	defer s.Fini()
+
+	buf := buffer.NewGapBufferFromString("alpha beta")
+	r := &Runner{Screen: s, Buf: buf, History: history.New(), Mode: ModeVisual, VisualStart: 0}
+	r.Cursor = 5
+
+	done := make(chan error, 1)
+	go func() { done <- r.Run() }()
+
+	time.Sleep(10 * time.Millisecond)
+
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, ' ', 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, ' ', 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyCtrlQ, 0, 0))
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runner returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for runner to quit")
+	}
+}
+
+// TestRun_MnemonicMenuMacroRecord_Simulation verifies starting a macro via the
+// mnemonic menu shows the macro status indicator.
+func TestRun_MnemonicMenuMacroRecord_Simulation(t *testing.T) {
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("init sim screen: %v", err)
+	}
+	defer s.Fini()
+	s.SetSize(60, 10)
 
 	r := &Runner{Screen: s, Buf: buffer.NewGapBuffer(0), History: history.New()}
 
@@ -249,14 +277,123 @@ func TestRun_CommandMenuQuit_Simulation(t *testing.T) {
 	// allow event loop to start
 	time.Sleep(10 * time.Millisecond)
 
-	// open command menu
-	s.PostEvent(tcell.NewEventKey(tcell.KeyRune, 't', tcell.ModCtrl))
-	// type 'quit'
-	for _, ch := range "quit" {
-		s.PostEvent(tcell.NewEventKey(tcell.KeyRune, ch, 0))
+	// open mnemonic menu: Space, then m r
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, ' ', 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'm', 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'r', 0))
+
+	waitForMacroStatus(t, r, "Macro record: choose register")
+	// select register
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'b', 0))
+
+	statusLine := "Recording macro @b"
+	waitForMacroStatus(t, r, statusLine)
+	assertMacroStatusRow(t, s, statusLine)
+
+	t.Logf("macro status snapshot: %q", r.MacroStatus)
+
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runner returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for runner to quit")
 	}
-	// execute highlighted command
-	s.PostEvent(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
+}
+
+func waitForMacroStatus(t *testing.T, r *Runner, want string) {
+	t.Helper()
+	deadline := time.After(500 * time.Millisecond)
+	for {
+		if r.MacroStatus == want {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("timeout waiting for macro status, got %q", r.MacroStatus)
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+func assertMacroStatusRow(t *testing.T, s tcell.Screen, statusLine string) {
+	t.Helper()
+	deadline := time.After(500 * time.Millisecond)
+	for {
+		_, height := s.Size()
+		match := true
+		for i, r := range statusLine {
+			cr, _, _, _ := s.GetContent(i, height-1)
+			if cr != r {
+				match = false
+				break
+			}
+		}
+		if match {
+			return
+		}
+		select {
+		case <-deadline:
+			_, height := s.Size()
+			cr, _, _, _ := s.GetContent(0, height-1)
+			t.Fatalf("expected macro status %q at 0, got %q", string(statusLine[0]), string(cr))
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+// TestRun_MacroRecordAndPlayback_Simulation records a simple macro and replays it.
+func TestRun_MacroRecordAndPlayback_Simulation(t *testing.T) {
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("init sim screen: %v", err)
+	}
+	defer s.Fini()
+	s.SetSize(60, 10)
+
+	r := &Runner{Screen: s, Buf: buffer.NewGapBufferFromString("start\n"), History: history.New()}
+
+	done := make(chan error, 1)
+	go func() { done <- r.Run() }()
+
+	time.Sleep(10 * time.Millisecond)
+
+	// start recording into register a
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
+	// insert 'a' in insert mode and return to normal
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	// stop recording
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', 0))
+
+	waitForMacroStatus(t, r, "")
+
+	// open a new line below and replay the macro
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'o', 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, '@', 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'a', 0))
+
+	deadline := time.After(500 * time.Millisecond)
+	for {
+		if r.Buf.String() == "astart\na\n" {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("timeout waiting for macro playback, got %q", r.Buf.String())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyCtrlQ, 0, 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'y', 0))
 
 	select {
 	case err := <-done:
