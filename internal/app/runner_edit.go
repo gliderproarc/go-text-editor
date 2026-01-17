@@ -1,12 +1,8 @@
 package app
 
 import (
-	"fmt"
-	"strings"
-
 	"example.com/texteditor/pkg/buffer"
 	"example.com/texteditor/pkg/search"
-	"github.com/gdamore/tcell/v2"
 )
 
 type repeatableChange struct {
@@ -65,89 +61,6 @@ func (r *Runner) visualHighlightRange() []search.Range {
 	return []search.Range{{Start: startBytes, End: endBytes, Group: "bg.select"}}
 }
 
-func isTextObjectDelimiter(delim rune) bool {
-	switch delim {
-	case '"', '\'', '`', '(', ')', '[', ']', '{', '}':
-		return true
-	default:
-		return false
-	}
-}
-
-func textObjectPair(delim rune) (open, close rune, ok bool) {
-	switch delim {
-	case '"', '\'', '`':
-		return delim, delim, true
-	case '(', ')':
-		return '(', ')', true
-	case '[', ']':
-		return '[', ']', true
-	case '{', '}':
-		return '{', '}', true
-	default:
-		return 0, 0, false
-	}
-}
-
-func (r *Runner) textObjectBounds(delim rune, around bool) (start, end int, ok bool) {
-	if r.Buf == nil || r.Buf.Len() == 0 {
-		return 0, 0, false
-	}
-	open, close, ok := textObjectPair(delim)
-	if !ok {
-		return 0, 0, false
-	}
-	cursor := r.Cursor
-	if cursor < 0 {
-		cursor = 0
-	}
-	if cursor >= r.Buf.Len() {
-		cursor = r.Buf.Len() - 1
-	}
-	leftSearch := cursor
-	rightSearch := cursor
-	if open == close {
-		if r.Buf.RuneAt(cursor) == open {
-			leftSearch = cursor - 1
-			rightSearch = cursor
-		}
-	} else {
-		if r.Buf.RuneAt(cursor) == open {
-			rightSearch = cursor + 1
-		} else if r.Buf.RuneAt(cursor) == close {
-			leftSearch = cursor - 1
-		}
-	}
-	left := -1
-	for i := leftSearch; i >= 0; i-- {
-		if r.Buf.RuneAt(i) == open {
-			left = i
-			break
-		}
-	}
-	right := -1
-	for i := rightSearch; i < r.Buf.Len(); i++ {
-		if r.Buf.RuneAt(i) == close {
-			right = i
-			break
-		}
-	}
-	if left == -1 || right == -1 || left >= right {
-		return 0, 0, false
-	}
-	if around {
-		start = left
-		end = right + 1
-	} else {
-		start = left + 1
-		end = right
-	}
-	if start < 0 || end > r.Buf.Len() || start >= end {
-		return 0, 0, false
-	}
-	return start, end, true
-}
-
 func (r *Runner) clearYankState() {
 	r.lastYankValid = false
 	r.lastYankStart = -1
@@ -179,6 +92,7 @@ func (r *Runner) insertText(text string) {
 	if !r.yankInProgress {
 		r.clearYankState()
 	}
+	pos := r.Cursor
 	r.captureInsertText(text)
 	_ = r.Buf.Insert(r.Cursor, []rune(text))
 	if r.History != nil {
@@ -195,6 +109,7 @@ func (r *Runner) insertText(text string) {
 	r.syntaxSrc = ""
 	// Mark buffer content changed for spell re-check coalescing
 	r.editSeq++
+	r.handleMultiEditInsert(text, pos)
 }
 
 func (r *Runner) captureInsertText(text string) {
@@ -459,170 +374,8 @@ func (r *Runner) deleteRange(start, end int, text string) error {
 	r.syntaxSrc = ""
 	// Mark buffer content changed for spell re-check coalescing
 	r.editSeq++
+	r.handleMultiEditDelete(start, end, text)
 	return nil
-}
-
-func (r *Runner) killRingPreview(text string) string {
-	if text == "" {
-		return "(empty)"
-	}
-	flat := strings.ReplaceAll(text, "\n", "\\n")
-	flat = strings.ReplaceAll(flat, "\t", "\\t")
-	max := 60
-	if len([]rune(flat)) > max {
-		runes := []rune(flat)
-		flat = string(runes[:max]) + "…"
-	}
-	return flat
-}
-
-func (r *Runner) killRingStatusLines() []string {
-	if !r.KillRing.HasData() {
-		return []string{"Kill ring is empty"}
-	}
-	lines := []string{
-		"Kill ring (Esc/Ctrl+G or Enter to accept)",
-		"Use Ctrl+N/P or arrows to cycle",
-	}
-	entries := r.KillRing.EntriesFromCurrent()
-	width := 0
-	height := 0
-	if r.Screen != nil {
-		width, height = r.Screen.Size()
-	}
-	maxEntries := len(entries)
-	if height > 0 {
-		maxEntries = height - len(lines) - 1
-	}
-	if maxEntries < 1 {
-		maxEntries = 1
-	}
-	if maxEntries > len(entries) {
-		maxEntries = len(entries)
-	}
-	for i := 0; i < maxEntries; i++ {
-		prefix := "  "
-		if i == 0 {
-			prefix = "> "
-		}
-		entry := prefix + r.killRingPreview(entries[i])
-		if width > 0 {
-			runes := []rune(entry)
-			if len(runes) > width {
-				entry = string(runes[:width])
-			}
-		}
-		lines = append(lines, entry)
-	}
-	if len(entries) > maxEntries {
-		lines = append(lines, fmt.Sprintf("  … and %d more", len(entries)-maxEntries))
-	}
-	return lines
-}
-
-func (r *Runner) showKillRingStatus() {
-	if r.Screen == nil {
-		return
-	}
-	lines := r.killRingStatusLines()
-	r.setMiniBuffer(lines)
-	r.draw(nil)
-}
-
-func (r *Runner) yankPop(direction int) {
-	if r.Buf == nil {
-		return
-	}
-	rotate := r.KillRing.Rotate
-	if direction < 0 {
-		rotate = r.KillRing.RotatePrev
-	}
-	if !r.lastYankValid {
-		if !rotate() {
-			r.showDialog("Kill ring has no alternate entries")
-			return
-		}
-		if r.Logger != nil {
-			r.Logger.Event("action", map[string]any{"name": "yank.pop.select", "text": r.KillRing.Get(), "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
-		}
-		if r.Screen != nil {
-			r.draw(nil)
-		}
-		r.showKillRingStatus()
-		return
-	}
-	if !rotate() {
-		r.showDialog("Kill ring has no alternate entries")
-		return
-	}
-	start := r.lastYankStart
-	end := r.lastYankEnd
-	count := r.lastYankCount
-	if count < 1 {
-		count = 1
-	}
-	if start < 0 || end < start || end > r.Buf.Len() {
-		r.clearYankState()
-		r.showDialog("Unable to cycle yank")
-		return
-	}
-	r.yankInProgress = true
-	r.Cursor = start
-	removed := string(r.Buf.Slice(start, end))
-	_ = r.deleteRange(start, end, removed)
-	text := r.KillRing.Get()
-	for i := 0; i < count; i++ {
-		r.insertText(text)
-	}
-	r.yankInProgress = false
-	r.lastYankStart = start
-	r.lastYankEnd = r.Cursor
-	r.lastYankCount = count
-	r.lastYankValid = true
-	if r.Logger != nil {
-		r.Logger.Event("action", map[string]any{"name": "yank.pop", "text": text, "cursor": r.Cursor, "buffer_len": r.Buf.Len()})
-	}
-	if r.Screen != nil {
-		r.draw(nil)
-	}
-	r.showKillRingStatus()
-}
-
-func (r *Runner) runKillRingCycle() {
-	if !r.KillRing.HasData() {
-		r.showDialog("Kill ring is empty")
-		return
-	}
-	if r.Screen == nil {
-		return
-	}
-	defer func() {
-		r.clearMiniBuffer()
-		r.draw(nil)
-	}()
-	r.yankPop(1)
-	for {
-		ev := r.waitEvent()
-		if ev == nil {
-			return
-		}
-		kev, ok := ev.(*tcell.EventKey)
-		if !ok {
-			continue
-		}
-		switch {
-		case r.isCancelKey(kev) || kev.Key() == tcell.KeyEnter:
-			return
-		case kev.Key() == tcell.KeyCtrlN || kev.Key() == tcell.KeyDown || kev.Key() == tcell.KeyRight:
-			r.yankPop(1)
-		case kev.Key() == tcell.KeyCtrlP || kev.Key() == tcell.KeyUp || kev.Key() == tcell.KeyLeft:
-			r.yankPop(-1)
-		case kev.Key() == tcell.KeyRune && kev.Rune() == 'n' && kev.Modifiers() == tcell.ModCtrl:
-			r.yankPop(1)
-		case kev.Key() == tcell.KeyRune && kev.Rune() == 'p' && kev.Modifiers() == tcell.ModCtrl:
-			r.yankPop(-1)
-		}
-	}
 }
 
 // moveCursorVertical moves the cursor up or down by delta lines, preserving the column when possible.
@@ -699,4 +452,68 @@ func (r *Runner) currentLineBounds() (start, end int) {
 		end++
 	}
 	return start, end
+}
+
+func (r *Runner) replaceRange(start, end int, replacement string) {
+	if r.Buf == nil {
+		return
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end > r.Buf.Len() {
+		end = r.Buf.Len()
+	}
+	if start >= end {
+		return
+	}
+	deleted := string(r.Buf.Slice(start, end))
+	if deleted == replacement {
+		return
+	}
+	if !r.yankInProgress {
+		r.clearYankState()
+	}
+	cursor := r.Cursor
+	cursorLine := r.CursorLine
+	replacementRunes := len([]rune(replacement))
+	deletedRunes := end - start
+	if start < cursor {
+		if cursor >= end {
+			cursor += replacementRunes - deletedRunes
+		} else {
+			cursor = start + replacementRunes
+		}
+		cursorLine += countNewlines(replacement) - countNewlines(deleted)
+		if cursorLine < 0 {
+			cursorLine = 0
+		}
+	}
+	_ = r.Buf.Delete(start, end)
+	if replacement != "" {
+		_ = r.Buf.Insert(start, []rune(replacement))
+	}
+	if r.History != nil {
+		if deleted != "" {
+			r.History.RecordDelete(start, deleted)
+		}
+		if replacement != "" {
+			r.History.RecordInsert(start, replacement)
+		}
+	}
+	r.Cursor = cursor
+	r.CursorLine = cursorLine
+	r.Dirty = true
+	r.syntaxSrc = ""
+	r.editSeq++
+}
+
+func countNewlines(s string) int {
+	count := 0
+	for _, ch := range s {
+		if ch == '\n' {
+			count++
+		}
+	}
+	return count
 }
