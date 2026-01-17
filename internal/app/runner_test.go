@@ -8,6 +8,7 @@ import (
 	"example.com/texteditor/pkg/buffer"
 	"example.com/texteditor/pkg/config"
 	"example.com/texteditor/pkg/history"
+	"example.com/texteditor/pkg/search"
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -196,6 +197,181 @@ func TestModeTransitions(t *testing.T) {
 	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlG, 0, 0))
 	if r.Mode != ModeNormal {
 		t.Fatalf("expected mode normal after Ctrl+G from visual")
+	}
+}
+
+func TestMultiEditUpdatesMatches(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("one two one"), Mode: ModeNormal}
+	r.enterMultiEdit("one", 0, 3)
+	if r.Mode != ModeMultiEdit {
+		t.Fatalf("expected multi-edit mode")
+	}
+	if r.MultiEdit == nil {
+		t.Fatalf("expected multi-edit state")
+	}
+	r.Cursor = 3
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'x', 0))
+	if got := r.Buf.String(); got != "onex two onex" {
+		t.Fatalf("expected multi-edit to update matches, got %q", got)
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected multi-edit to exit on Esc")
+	}
+}
+
+func TestMultiEditSelectionMoveAndAppend(t *testing.T) {
+	text := "test\nfoo test\nbar test\n"
+	r := &Runner{Buf: buffer.NewGapBufferFromString(text), Mode: ModeVisual, VisualStart: 3}
+	r.Cursor = 0
+	r.toggleMultiEdit()
+	if r.Mode != ModeMultiEdit {
+		t.Fatalf("expected multi-edit mode")
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'e', 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'd', 0))
+
+	expected := "tested\nfoo tested\nbar tested\n"
+	if got := r.Buf.String(); got != expected {
+		t.Fatalf("expected %q, got %q", expected, got)
+	}
+}
+
+func TestMultiEditArrowKeyEditThreeLines(t *testing.T) {
+	text := "cat\ncat\ncat\n"
+	r := &Runner{Buf: buffer.NewGapBufferFromString(text), Mode: ModeNormal}
+	r.enterMultiEdit("cat", 0, 3)
+	if r.Mode != ModeMultiEdit {
+		t.Fatalf("expected multi-edit mode")
+	}
+	r.Cursor = 3
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyLeft, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'r', 0))
+
+	expected := "cart\ncart\ncart\n"
+	if got := r.Buf.String(); got != expected {
+		t.Fatalf("expected %q, got %q", expected, got)
+	}
+}
+
+func TestMultiEditCtrlBMoveWithinSelection(t *testing.T) {
+	text := "dog\ndog\ndog\n"
+	r := &Runner{Buf: buffer.NewGapBufferFromString(text), Mode: ModeNormal}
+	r.enterMultiEdit("dog", 0, 3)
+	if r.Mode != ModeMultiEdit {
+		t.Fatalf("expected multi-edit mode")
+	}
+	r.Cursor = 3
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyCtrlB, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'g', 0))
+
+	expected := "dogg\ndogg\ndogg\n"
+	if got := r.Buf.String(); got != expected {
+		t.Fatalf("expected %q, got %q", expected, got)
+	}
+}
+
+func TestMultiEditSelectionDeleteWithinMatch(t *testing.T) {
+	text := "test\ntest\ntest\n"
+	r := &Runner{Buf: buffer.NewGapBufferFromString(text), Mode: ModeVisual, VisualStart: 13}
+	r.Cursor = 10
+	r.toggleMultiEdit()
+	if r.Mode != ModeMultiEdit {
+		t.Fatalf("expected multi-edit mode")
+	}
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRight, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyDelete, 0, 0))
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+
+	expected := "tst\ntst\ntst\n"
+	if got := r.Buf.String(); got != expected {
+		t.Fatalf("expected %q, got %q", expected, got)
+	}
+	if r.Mode != ModeNormal {
+		t.Fatalf("expected to exit multi-edit mode")
+	}
+}
+
+func TestMultiEditChangeDoesNotCaptureNewMatches(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("one two one"), Mode: ModeNormal}
+	r.enterMultiEdit("one", 0, 3)
+	if r.Mode != ModeMultiEdit {
+		t.Fatalf("expected multi-edit mode")
+	}
+	if r.MultiEdit == nil {
+		t.Fatalf("expected multi-edit state")
+	}
+	r.Cursor = 3
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'x', 0))
+	if got := r.Buf.String(); got != "onex two onex" {
+		t.Fatalf("expected buffer to update matches, got %q", got)
+	}
+	r.Cursor = 4
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyBackspace, 0, 0))
+	if got := r.Buf.String(); got != "one two one" {
+		t.Fatalf("expected buffer to revert matches, got %q", got)
+	}
+	matches := search.SearchAll(r.Buf.String(), "one")
+	if len(matches) != 2 {
+		t.Fatalf("expected two matches after revert, got %d", len(matches))
+	}
+}
+
+func TestMultiEditPrimaryMatchRemainsSelected(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("alpha beta alpha"), Mode: ModeNormal}
+	r.Cursor = 11
+	r.CursorLine = 0
+	r.enterMultiEditFromQuery("alpha")
+	if r.Mode != ModeMultiEdit {
+		t.Fatalf("expected multi-edit mode")
+	}
+	r.Cursor = r.MultiEdit.primaryEnd
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'x', 0))
+	if got := r.Buf.String(); got != "alphax beta alphax" {
+		t.Fatalf("expected matches to update, got %q", got)
+	}
+	if r.MultiEdit == nil || len(r.MultiEdit.matches) == 0 {
+		t.Fatalf("expected multi-edit matches to remain")
+	}
+	text := r.Buf.String()
+	if r.MultiEdit.target != "alphax" {
+		t.Fatalf("expected multi-edit target to track changes")
+	}
+	matches := search.SearchAll(text, "alphax")
+	if len(matches) != 2 {
+		t.Fatalf("expected both matches to update, got %d", len(matches))
+	}
+	if r.MultiEdit.matches[0].Start != matches[0].Start && r.MultiEdit.matches[0].Start != matches[1].Start {
+		t.Fatalf("expected primary match to remain selected")
+	}
+}
+
+func TestMultiEditEditOutsideSelectionDoesNotExpandMatches(t *testing.T) {
+	r := &Runner{Buf: buffer.NewGapBufferFromString("foo bar foo"), Mode: ModeNormal}
+	r.enterMultiEdit("foo", 0, 3)
+	if r.Mode != ModeMultiEdit {
+		t.Fatalf("expected multi-edit mode")
+	}
+	if r.MultiEdit == nil {
+		t.Fatalf("expected multi-edit state")
+	}
+	r.Cursor = 4
+	r.handleKeyEvent(tcell.NewEventKey(tcell.KeyRune, 'z', 0))
+	if got := r.Buf.String(); got != "foo zbar foo" {
+		t.Fatalf("expected middle insert only, got %q", got)
+	}
+	if r.MultiEdit == nil || len(r.MultiEdit.matches) != 2 {
+		t.Fatalf("expected two matches to remain, got %d", len(r.MultiEdit.matches))
+	}
+	text := r.Buf.String()
+	startFirst := runeIndexToByteOffset(text, 0)
+	startSecond := runeIndexToByteOffset(text, 9)
+	if r.MultiEdit.matches[0].Start != startFirst || r.MultiEdit.matches[1].Start != startSecond {
+		t.Fatalf("expected matches unchanged after outside edit")
 	}
 }
 

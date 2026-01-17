@@ -93,6 +93,7 @@ func (r *Runner) mnemonicMenu() []*mnemonicNode {
 			name: "menu",
 			children: []*mnemonicNode{
 				{key: 'c', name: "command menu", action: func() bool { return r.runCommandMenu() }},
+				{key: 'm', name: "multi-edit", action: func() bool { r.toggleMultiEdit(); return false }},
 			},
 		},
 
