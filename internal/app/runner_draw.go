@@ -22,6 +22,7 @@ type renderState struct {
 	showHelp    bool
 	bufLen      int
 	theme       config.Theme
+	view        View
 }
 
 // Minimal UI helpers (kept here so runner does not depend on package main)
@@ -137,8 +138,10 @@ func drawBuffer(s tcell.Screen, buf *buffer.GapBuffer, fname string, highlights 
 func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
 	r.ensureCursorVisible()
 	// kick background updates based on current viewport/content (non-blocking)
-	r.updateSpellAsync()
-	r.updateSyntaxAsync()
+	if r.View != ViewFileManager {
+		r.updateSpellAsync()
+		r.updateSyntaxAsync()
+	}
 	if vh := r.visualHighlightRange(); len(vh) > 0 {
 		highlights = append(highlights, vh...)
 	}
@@ -160,6 +163,9 @@ func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
 		lines = r.Buf.Lines()
 		bufLen = r.Buf.Len()
 	}
+	if r.View == ViewFileManager && r.Buf == nil {
+		bufLen = 1
+	}
 	return renderState{
 		lines:       lines,
 		filePath:    r.FilePath,
@@ -174,6 +180,7 @@ func (r *Runner) renderSnapshot(highlights []search.Range) renderState {
 		showHelp:    r.ShowHelp,
 		bufLen:      bufLen,
 		theme:       r.Theme,
+		view:        r.View,
 	}
 }
 
@@ -183,11 +190,11 @@ func renderToScreen(s tcell.Screen, st renderState) {
 		drawHelp(s, st.theme)
 		return
 	}
-	if st.bufLen > 0 {
+	if st.bufLen > 0 || st.view == ViewFileManager {
 		drawFile(s, st.filePath, st.lines, st.highlights, st.cursor, st.dirty, st.mode, st.overlay, st.topLine, st.miniBuf, st.theme, st.macroStatus)
-	} else {
-		drawUI(s, st.theme, st.macroStatus)
+		return
 	}
+	drawUI(s, st.theme, st.macroStatus)
 }
 
 // draw renders the buffer with optional highlights and current visual selection.
@@ -382,6 +389,63 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 	}
 	if dirty {
 		display += " [+]"
+	}
+	isFileManager := false
+	if len(display) >= len("[File Manager]") && display[:len("[File Manager]")] == "[File Manager]" {
+		isFileManager = true
+	}
+	if isFileManager {
+		modeTag := "<FM>"
+		status := modeTag + "  " + display + " — Enter to open, Esc to close"
+		if len(status) > width {
+			status = string([]rune(status)[:width])
+		}
+		modeColor := tcell.ColorOrange
+		statusRow := height - 1
+		if macroStatus != "" {
+			statusRow = height - 2
+		}
+		for i, r := range status {
+			style := tcell.StyleDefault.Foreground(th.StatusForeground).Background(th.StatusBackground)
+			if i < len(modeTag) {
+				style = tcell.StyleDefault.Foreground(modeColor).Background(th.StatusBackground).Attributes(tcell.AttrBold)
+			}
+			s.SetContent(i, statusRow, r, nil, style)
+		}
+		if macroStatus != "" {
+			macroLine := macroStatus
+			if len(macroLine) > width {
+				macroLine = string([]rune(macroLine)[:width])
+			}
+			for i, r := range macroLine {
+				style := tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground)
+				s.SetContent(i, height-1, r, nil, style)
+			}
+			for i := len([]rune(macroLine)); i < width; i++ {
+				style := tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground)
+				s.SetContent(i, height-1, ' ', nil, style)
+			}
+		}
+		// draw mini-buffer lines just above status bar
+		for i, line := range minibuf {
+			y := height - statusLineCount - mbHeight + i
+			runes := []rune(line)
+			defStyle := tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground)
+			isMnemonic := len(runes) >= 4 && runes[0] == ' ' && runes[2] == ' ' && runes[3] == '-'
+			for x := 0; x < width; x++ {
+				ch := ' '
+				style := defStyle
+				if x < len(runes) {
+					ch = runes[x]
+					if isMnemonic && x == 1 {
+						style = tcell.StyleDefault.Foreground(th.MenuKeyForeground).Background(th.MiniBackground)
+					}
+				}
+				s.SetContent(x, y, ch, nil, style)
+			}
+		}
+		s.Show()
+		return
 	}
 	// status mode indicator
 	modeTag := "<N>"

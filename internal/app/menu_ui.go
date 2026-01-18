@@ -14,7 +14,7 @@ type command struct {
 
 func (r *Runner) commandList() []command {
 	return []command{
-		{name: "open file", action: func() bool { r.runOpenPrompt(); return false }},
+		{name: "open file manager", action: func() bool { r.runFileManager(); return false }},
 		{name: "save", action: func() bool {
 			if r.FilePath == "" {
 				r.runSaveAsPrompt()

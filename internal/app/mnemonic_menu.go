@@ -20,8 +20,8 @@ func (r *Runner) mnemonicMenu() []*mnemonicNode {
 			key:  'f',
 			name: "file",
 			children: []*mnemonicNode{
-				{key: 'o', name: "open file", action: func() bool {
-					r.runOpenPrompt()
+				{key: 'o', name: "open file manager", action: func() bool {
+					r.runFileManager()
 					return false
 				}},
 				{key: 's', name: "save", action: func() bool {

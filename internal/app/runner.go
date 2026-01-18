@@ -79,6 +79,10 @@ type Runner struct {
 	MacroStatus string
 	// Multi-edit mode state (nil when inactive)
 	MultiEdit *multiEditState
+	// Active view (editor or file manager)
+	View View
+	// File manager state (nil when inactive)
+	FileManager *fileManagerState
 	// Monotonic edit sequence; increments on any buffer mutation (insert/delete/undo/redo).
 	editSeq int64
 	// Last yank (paste) range for yank-pop.
@@ -155,6 +159,8 @@ func New() *Runner {
 		VisualStart:    -1,
 		Keymap:         config.DefaultKeymap(),
 		Theme:          config.TerminalTheme(),
+		View:           ViewEditor,
+		CursorLine:     0,
 		Ed:             ed,
 		lastYankStart:  -1,
 		lastYankEnd:    -1,

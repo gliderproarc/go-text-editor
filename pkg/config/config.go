@@ -37,6 +37,7 @@ func DefaultKeymap() map[string]Keybinding {
 		"search":     mustParse("Ctrl+W"),
 		"multi-edit": mustParse("Ctrl+L"),
 		"menu":       mustParse("Ctrl+T"),
+		"open":       mustParse("Ctrl+O"),
 	}
 }
 

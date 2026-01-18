@@ -2,6 +2,7 @@ package app
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -127,20 +128,15 @@ func TestRunner_SaveAs_WritesAndClearsDirty(t *testing.T) {
 }
 
 // TestRun_OpenFilePrompt_Simulation verifies that pressing Ctrl+O opens the
-// prompt; typing a valid path and pressing Enter loads the file into the buffer.
+// file manager; selecting a file opens it into the buffer.
 func TestRun_OpenFilePrompt_Simulation(t *testing.T) {
 	// Prepare a temp file to open
-	tf, err := os.CreateTemp("", "texteditor_open_*")
-	if err != nil {
-		t.Fatalf("create temp: %v", err)
-	}
-	path := tf.Name()
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "open.txt")
 	content := "hello\nworld\n"
-	if _, err := tf.WriteString(content); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("write temp: %v", err)
 	}
-	_ = tf.Close()
-	defer os.Remove(path)
 
 	// Set up simulation screen
 	s := tcell.NewSimulationScreen("UTF-8")
@@ -157,12 +153,27 @@ func TestRun_OpenFilePrompt_Simulation(t *testing.T) {
 	// Give the loop a moment to start
 	time.Sleep(10 * time.Millisecond)
 
-	// Open prompt via dedicated control key (as emitted in real logs)
+	// Open file manager via dedicated control key (as emitted in real logs)
 	s.PostEventWait(tcell.NewEventKey(tcell.KeyCtrlO, 0, 0))
-	// Type the path and press Enter
-	for _, ch := range path {
-		s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, ch, 0))
+	for i := 0; i < 50; i++ {
+		if r.View == ViewFileManager {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
+	if r.View != ViewFileManager {
+		t.Fatalf("expected file manager view")
+	}
+	if r.FileManager == nil {
+		t.Fatalf("expected file manager state")
+	}
+	r.FileManager.Dir = tmpDir
+	if err := r.loadFileManagerDir(tmpDir); err != nil {
+		t.Fatalf("load dir: %v", err)
+	}
+
+	// Move to file entry and open it.
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyDown, 0, 0))
 	s.PostEventWait(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
 	// Quit to end the loop
 	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
@@ -176,12 +187,159 @@ func TestRun_OpenFilePrompt_Simulation(t *testing.T) {
 		t.Fatalf("timeout waiting for runner to quit")
 	}
 
-	// Assert file got loaded (not raw typed path into buffer)
+	// Assert file got loaded
 	if r.FilePath != path {
 		t.Fatalf("expected FilePath=%q after open, got %q", path, r.FilePath)
 	}
 	if got := r.Buf.String(); got != content {
 		t.Fatalf("expected buffer to equal file content, got %q", got)
+	}
+}
+
+// TestRun_FileManager_OpenEntry_Simulation verifies Ctrl+O opens the file manager
+// and Enter opens the first file entry.
+func TestRun_FileManager_OpenEntry_Simulation(t *testing.T) {
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "sample.txt")
+	content := "hello file manager"
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("init sim screen: %v", err)
+	}
+	defer s.Fini()
+
+	r := &Runner{Screen: s, Buf: buffer.NewGapBuffer(0), History: history.New()}
+
+	done := make(chan error, 1)
+	go func() { done <- r.Run() }()
+
+	time.Sleep(10 * time.Millisecond)
+
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyCtrlO, 0, 0))
+	// Wait for file manager to initialize and list entries.
+	for i := 0; i < 50; i++ {
+		if r.View == ViewFileManager {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if r.View != ViewFileManager {
+		t.Fatalf("expected file manager view")
+	}
+	if r.FileManager == nil {
+		t.Fatalf("expected file manager state")
+	}
+	r.FileManager.Dir = tmpDir
+	if err := r.loadFileManagerDir(tmpDir); err != nil {
+		t.Fatalf("load dir: %v", err)
+	}
+	// Move to the next entry (first file after ..).
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyDown, 0, 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runner returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for runner to quit")
+	}
+
+	if r.FilePath != filePath {
+		t.Fatalf("expected FilePath=%q after open, got %q", filePath, r.FilePath)
+	}
+	if got := r.Buf.String(); got != content {
+		t.Fatalf("expected buffer to equal file content, got %q", got)
+	}
+}
+
+// TestRun_FileManager_Rename_Simulation verifies renaming a file from insert mode
+// prompts for confirmation and applies the change.
+func TestRun_FileManager_Rename_Simulation(t *testing.T) {
+	tmpDir := t.TempDir()
+	oldPath := filepath.Join(tmpDir, "alpha.txt")
+	newPath := filepath.Join(tmpDir, "beta.txt")
+	if err := os.WriteFile(oldPath, []byte("data"), 0644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	s := tcell.NewSimulationScreen("UTF-8")
+	if err := s.Init(); err != nil {
+		t.Fatalf("init sim screen: %v", err)
+	}
+	defer s.Fini()
+
+	r := &Runner{Screen: s, Buf: buffer.NewGapBuffer(0), History: history.New()}
+
+	done := make(chan error, 1)
+	go func() { done <- r.Run() }()
+
+	time.Sleep(10 * time.Millisecond)
+
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyCtrlO, 0, 0))
+	for i := 0; i < 50; i++ {
+		if r.View == ViewFileManager {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if r.View != ViewFileManager {
+		t.Fatalf("expected file manager view")
+	}
+	if r.FileManager == nil {
+		t.Fatalf("expected file manager state")
+	}
+	r.FileManager.Dir = tmpDir
+	if err := r.loadFileManagerDir(tmpDir); err != nil {
+		t.Fatalf("load dir: %v", err)
+	}
+
+	// Move to file entry and enter insert mode.
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyDown, 0, 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'i', 0))
+	// Ensure cursor is at the start of the filename field.
+	if r.FileManager == nil {
+		t.Fatalf("expected file manager state")
+	}
+	nameStart := r.fileManagerNameStartPos(1)
+	for r.Cursor > nameStart {
+		s.PostEventWait(tcell.NewEventKey(tcell.KeyLeft, 0, 0))
+	}
+
+	// Remove "alpha" and type "beta".
+	for i := 0; i < len("alpha"); i++ {
+		s.PostEventWait(tcell.NewEventKey(tcell.KeyDelete, 0, 0))
+	}
+	for _, ch := range "beta" {
+		s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, ch, 0))
+	}
+
+	// Exit insert mode and confirm rename.
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyEsc, 0, 0))
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'y', 0))
+
+	s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, 'q', tcell.ModCtrl))
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("runner returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timeout waiting for runner to quit")
+	}
+
+	if _, err := os.Stat(newPath); err != nil {
+		t.Fatalf("expected renamed file at %q: %v", newPath, err)
+	}
+	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
+		t.Fatalf("expected old file to be missing")
 	}
 }
 

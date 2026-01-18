@@ -10,6 +10,9 @@ import (
 // handleKeyEvent processes a key event. It returns true if the event signals
 // the runner should quit.
 func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
+	if r.View == ViewFileManager {
+		return r.handleFileManagerKey(ev)
+	}
 	switch r.Mode {
 	case ModeNormal:
 		if r.PendingG && !(ev.Key() == tcell.KeyRune && ev.Rune() == 'g' && ev.Modifiers() == 0) {
@@ -640,6 +643,13 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
+	if r.matchCommand(ev, "open") {
+		r.runFileManager()
+		if r.Logger != nil {
+			r.Logger.Event("action", map[string]any{"name": "open.file_manager"})
+		}
+		return false
+	}
 	if r.matchCommand(ev, "multi-edit") {
 		r.toggleMultiEdit()
 		if r.Logger != nil {
@@ -652,9 +662,9 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	}
 	// Ctrl+O -> open file prompt (handle both rune+Ctrl and dedicated control key)
 	if (ev.Key() == tcell.KeyRune && ev.Rune() == 'o' && ev.Modifiers() == tcell.ModCtrl) || ev.Key() == tcell.KeyCtrlO {
-		r.runOpenPrompt()
+		r.runFileManager()
 		if r.Logger != nil {
-			r.Logger.Event("action", map[string]any{"name": "open.prompt"})
+			r.Logger.Event("action", map[string]any{"name": "open.file_manager"})
 		}
 		if r.Screen != nil {
 			r.draw(nil)
