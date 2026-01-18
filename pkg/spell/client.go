@@ -1,14 +1,14 @@
 package spell
 
 import (
-    "bufio"
-    "context"
-    "errors"
-    "io"
-    "os/exec"
-    "strings"
-    "sync"
-    "time"
+	"bufio"
+	"context"
+	"errors"
+	"io"
+	"os/exec"
+	"strings"
+	"sync"
+	"time"
 )
 
 // Client manages a long-lived external spell checking process communicating
@@ -16,149 +16,158 @@ import (
 // words, and a single-line response of whitespace-separated words that need
 // checking (e.g., misspellings or unknown words).
 type Client struct {
-    mu   sync.Mutex
-    cmd  *exec.Cmd
-    in   io.WriteCloser
-    out  *bufio.Reader
-    done chan struct{}
+	mu   sync.Mutex
+	cmd  *exec.Cmd
+	in   io.WriteCloser
+	out  *bufio.Reader
+	done chan struct{}
 }
 
 // Start launches the external process with the given command and arguments.
 // The process must read from stdin and write responses to stdout.
 func (c *Client) Start(command string, args ...string) error {
-    c.mu.Lock()
-    defer c.mu.Unlock()
-    if c.cmd != nil {
-        return nil
-    }
-    cmd := exec.Command(command, args...)
-    stdin, err := cmd.StdinPipe()
-    if err != nil {
-        return err
-    }
-    stdout, err := cmd.StdoutPipe()
-    if err != nil {
-        _ = stdin.Close()
-        return err
-    }
-    // In case the process writes to stderr, we ignore it for now.
-    if err := cmd.Start(); err != nil {
-        _ = stdin.Close()
-        return err
-    }
-    c.cmd = cmd
-    c.in = stdin
-    c.out = bufio.NewReader(stdout)
-    c.done = make(chan struct{})
-    go func() {
-        _ = cmd.Wait()
-        close(c.done)
-    }()
-    return nil
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.cmd != nil {
+		return nil
+	}
+	cmd := exec.Command(command, args...)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		_ = stdin.Close()
+		return err
+	}
+	// In case the process writes to stderr, we ignore it for now.
+	if err := cmd.Start(); err != nil {
+		_ = stdin.Close()
+		return err
+	}
+	c.cmd = cmd
+	c.in = stdin
+	c.out = bufio.NewReader(stdout)
+	c.done = make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(c.done)
+	}()
+	return nil
 }
 
 // Stop terminates the process if running.
 func (c *Client) Stop() {
-    c.mu.Lock()
-    defer c.mu.Unlock()
-    if c.cmd == nil {
-        return
-    }
-    _ = c.in.Close()
-    _ = c.cmd.Process.Kill()
-    <-c.done
-    c.cmd = nil
-    c.in = nil
-    c.out = nil
-    c.done = nil
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.cmd == nil {
+		return
+	}
+	_ = c.in.Close()
+	_ = c.cmd.Process.Kill()
+	<-c.done
+	c.cmd = nil
+	c.in = nil
+	c.out = nil
+	c.done = nil
 }
 
 // Check sends the provided words (space-separated) and returns the subset
 // that require checking, as returned by the external process. It returns
 // an error if the client is not started or if the protocol fails.
 func (c *Client) Check(words []string) ([]string, error) {
-    c.mu.Lock()
-    defer c.mu.Unlock()
-    if c.cmd == nil || c.in == nil || c.out == nil {
-        return nil, errors.New("spell client is not started")
-    }
-    // Send a single line with whitespace-separated words.
-    line := strings.Join(words, " ") + "\n"
-    if _, err := io.WriteString(c.in, line); err != nil {
-        return nil, err
-    }
-    // Read a single response line.
-    resp, err := c.out.ReadString('\n')
-    if err != nil {
-        return nil, err
-    }
-    resp = strings.TrimSpace(resp)
-    if resp == "" {
-        return nil, nil
-    }
-    parts := strings.Fields(resp)
-    // Normalize to lower-case for stability.
-    for i := range parts {
-        parts[i] = strings.ToLower(parts[i])
-    }
-    return parts, nil
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.cmd == nil || c.in == nil || c.out == nil {
+		return nil, errors.New("spell client is not started")
+	}
+	// Send a single line with whitespace-separated words.
+	line := strings.Join(words, " ") + "\n"
+	if _, err := io.WriteString(c.in, line); err != nil {
+		return nil, err
+	}
+	// Read a single response line.
+	resp, err := c.out.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	resp = strings.TrimSpace(resp)
+	if resp == "" {
+		if errors.Is(err, io.EOF) {
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	parts := strings.Fields(resp)
+	// Normalize to lower-case for stability.
+	for i := range parts {
+		parts[i] = strings.ToLower(parts[i])
+	}
+	return parts, nil
 }
 
 // CheckWithTimeout behaves like Check but aborts if no response is received
 // within the provided timeout. On timeout, the underlying process is killed
 // to unblock any pending read, and context.DeadlineExceeded is returned.
 func (c *Client) CheckWithTimeout(words []string, timeout time.Duration) ([]string, error) {
-    type result struct {
-        bad []string
-        err error
-    }
-    done := make(chan result, 1)
+	type result struct {
+		bad []string
+		err error
+	}
+	done := make(chan result, 1)
 
-    c.mu.Lock()
-    if c.cmd == nil || c.in == nil || c.out == nil {
-        c.mu.Unlock()
-        return nil, errors.New("spell client is not started")
-    }
-    cmd := c.cmd
-    in := c.in
-    out := c.out
+	c.mu.Lock()
+	if c.cmd == nil || c.in == nil || c.out == nil {
+		c.mu.Unlock()
+		return nil, errors.New("spell client is not started")
+	}
+	cmd := c.cmd
+	in := c.in
+	out := c.out
 
-    go func() {
-        // Perform I/O without touching struct fields; unlock when finished.
-        line := strings.Join(words, " ") + "\n"
-        if _, err := io.WriteString(in, line); err != nil {
-            done <- result{nil, err}
-            c.mu.Unlock()
-            return
-        }
-        resp, err := out.ReadString('\n')
-        if err != nil {
-            done <- result{nil, err}
-            c.mu.Unlock()
-            return
-        }
-        resp = strings.TrimSpace(resp)
-        if resp == "" {
-            done <- result{nil, nil}
-            c.mu.Unlock()
-            return
-        }
-        parts := strings.Fields(resp)
-        for i := range parts {
-            parts[i] = strings.ToLower(parts[i])
-        }
-        done <- result{parts, nil}
-        c.mu.Unlock()
-    }()
+	go func() {
+		// Perform I/O without touching struct fields; unlock when finished.
+		line := strings.Join(words, " ") + "\n"
+		if _, err := io.WriteString(in, line); err != nil {
+			done <- result{nil, err}
+			c.mu.Unlock()
+			return
+		}
+		resp, err := out.ReadString('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
+			done <- result{nil, err}
+			c.mu.Unlock()
+			return
+		}
+		resp = strings.TrimSpace(resp)
+		if resp == "" {
+			if errors.Is(err, io.EOF) {
+				done <- result{nil, err}
+				c.mu.Unlock()
+				return
+			}
+			done <- result{nil, nil}
+			c.mu.Unlock()
+			return
+		}
+		parts := strings.Fields(resp)
+		for i := range parts {
+			parts[i] = strings.ToLower(parts[i])
+		}
+		done <- result{parts, nil}
+		c.mu.Unlock()
+	}()
 
-    select {
-    case r := <-done:
-        return r.bad, r.err
-    case <-time.After(timeout):
-        // Kill the process to unblock the pending read.
-        _ = cmd.Process.Kill()
-        // Ensure the goroutine finishes and releases the lock.
-        <-done
-        return nil, context.DeadlineExceeded
-    }
+	select {
+	case r := <-done:
+		return r.bad, r.err
+	case <-time.After(timeout):
+		// Kill the process to unblock the pending read.
+		_ = cmd.Process.Kill()
+		// Ensure the goroutine finishes and releases the lock.
+		<-done
+		return nil, context.DeadlineExceeded
+	}
 }
