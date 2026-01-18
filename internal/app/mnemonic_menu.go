@@ -104,8 +104,12 @@ func (r *Runner) mnemonicMenu() []*mnemonicNode {
 			key:  's',
 			name: "search",
 			children: []*mnemonicNode{
-				{key: 's', name: "search", action: func() bool {
-					r.runSearchPrompt()
+				{key: 's', name: "search (case-insensitive)", action: func() bool {
+					r.runSearchPromptCase(false)
+					return false
+				}},
+				{key: 'S', name: "search (case-sensitive)", action: func() bool {
+					r.runSearchPromptCase(true)
 					return false
 				}},
 			},

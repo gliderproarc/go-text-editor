@@ -12,6 +12,11 @@ import (
 // match; Esc or Ctrl+G cancels. This is a synchronous helper that polls events from the
 // runner's screen.
 func (r *Runner) runSearchPrompt() {
+	r.runSearchPromptCase(true)
+}
+
+// runSearchPromptCase runs the search prompt with optional case sensitivity.
+func (r *Runner) runSearchPromptCase(caseSensitive bool) {
 	if r.Screen == nil {
 		return
 	}
@@ -24,7 +29,7 @@ func (r *Runner) runSearchPrompt() {
 		text := r.Buf.String()
 		var raw []search.Range
 		if query != "" {
-			raw = search.SearchAll(text, query)
+			raw = search.SearchAllCase(text, query, caseSensitive)
 		}
 		// compute default selection relative to cursor when needed
 		if query == "" || len(raw) == 0 {
