@@ -37,6 +37,7 @@ func drawUI(s tcell.Screen, th config.Theme, macroStatus string) {
 		s.SetContent(msgX+i, msgY, r, nil, tcell.StyleDefault.Foreground(th.TextDefault))
 	}
 	status := "Press Ctrl+Q to exit"
+	status = appendMacroStatus(status, macroStatus)
 	sbX := (width - len(status)) / 2
 	statusRow := height - 1
 	for i, r := range status {
@@ -44,6 +45,13 @@ func drawUI(s tcell.Screen, th config.Theme, macroStatus string) {
 	}
 	drawMacroRecordingIndicator(s, th, statusRow, width, macroStatus)
 	s.Show()
+}
+
+func appendMacroStatus(status string, macroStatus string) string {
+	if macroStatus == "" {
+		return status
+	}
+	return status + " | " + macroStatus
 }
 
 func drawHelp(s tcell.Screen, th config.Theme) {
@@ -382,6 +390,7 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 	if isFileManager {
 		modeTag := "<FM>"
 		status := modeTag + "  " + display + " — Enter to open, Esc to close"
+		status = appendMacroStatus(status, macroStatus)
 		status = truncateStatusForIndicator(status, width, macroStatus)
 		modeColor := tcell.ColorOrange
 		statusRow := height - 1
@@ -434,6 +443,7 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 		}
 	}
 	status := modeTag + "  " + display + " — Press Ctrl+Q to exit"
+	status = appendMacroStatus(status, macroStatus)
 	status = truncateStatusForIndicator(status, width, macroStatus)
 	// Colorize mode indicators: <N>, <V>, <I> match cursor; <M>=orange; <S>=red
 	modeColor := th.StatusForeground

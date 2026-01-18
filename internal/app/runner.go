@@ -101,6 +101,8 @@ type Runner struct {
 	macroPlayback       []macroEvent
 	macroPlaying        bool
 	macroLastRegister   string
+	macroRepeatPending  bool
+	macroRepeatAwaitAt  bool
 }
 
 func (r *Runner) setMiniBuffer(lines []string) {

@@ -62,6 +62,8 @@ func (r *Runner) beginMacroPlayback(register string) bool {
 		r.updateMacroStatus()
 		return false
 	}
+	r.macroRepeatPending = false
+	r.macroRepeatAwaitAt = false
 	if register == "" {
 		r.macroPendingPlay = true
 		r.updateMacroStatus()
@@ -75,6 +77,8 @@ func (r *Runner) startMacroPlayback(register string) bool {
 		r.updateMacroStatus()
 		return false
 	}
+	r.macroRepeatPending = false
+	r.macroRepeatAwaitAt = false
 	macro := r.macroRegisters[register]
 	if len(macro) == 0 {
 		r.updateMacroStatus()
@@ -107,6 +111,8 @@ func (r *Runner) macroEventFromKey(ev *tcell.EventKey) macroEvent {
 func (r *Runner) consumeMacroEvent() (*tcell.EventKey, bool) {
 	if len(r.macroPlayback) == 0 {
 		r.macroPlaying = false
+		r.macroRepeatPending = true
+		r.macroRepeatAwaitAt = false
 		r.updateMacroStatus()
 		return nil, false
 	}
@@ -123,11 +129,12 @@ func (r *Runner) consumeMacroEvent() (*tcell.EventKey, bool) {
 func (r *Runner) clearMacroPending() {
 	r.macroPendingPlay = false
 	r.macroPendingRecord = false
+	r.macroRepeatPending = false
 	r.updateMacroStatus()
 }
 
 func (r *Runner) isMacroCaptureAllowed(ev *tcell.EventKey) bool {
-	if !r.macroRecording || r.macroPlaying {
+	if !r.macroRecording || r.macroPlaying || r.macroRepeatPending || r.macroRepeatAwaitAt {
 		return false
 	}
 	if r.matchCommand(ev, "save") || r.matchCommand(ev, "quit") || r.matchCommand(ev, "menu") {
@@ -140,7 +147,7 @@ func (r *Runner) shouldRecordMacroEvent(ev *tcell.EventKey) bool {
 	if !r.isMacroCaptureAllowed(ev) {
 		return false
 	}
-	if r.macroPendingRecord || r.macroPendingPlay {
+	if r.macroPendingRecord || r.macroPendingPlay || r.macroRepeatPending || r.macroRepeatAwaitAt {
 		return false
 	}
 	if r.Mode == ModeNormal && ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
@@ -152,8 +159,81 @@ func (r *Runner) shouldRecordMacroEvent(ev *tcell.EventKey) bool {
 	return true
 }
 
+func (r *Runner) handleMacroRepeat(ev *tcell.EventKey) bool {
+	if !r.macroRepeatPending {
+		return false
+	}
+	if r.isCancelKey(ev) {
+		r.macroRepeatPending = false
+		r.macroRepeatAwaitAt = false
+		r.updateMacroStatus()
+		if r.Screen != nil {
+			r.draw(nil)
+		}
+		return true
+	}
+	if ev.Key() != tcell.KeyRune || ev.Modifiers() != 0 {
+		r.macroRepeatPending = false
+		r.macroRepeatAwaitAt = false
+		r.updateMacroStatus()
+		return false
+	}
+	if r.macroRepeatAwaitAt {
+		r.macroRepeatPending = false
+		r.macroRepeatAwaitAt = false
+		r.updateMacroStatus()
+		return false
+	}
+	runeKey := ev.Rune()
+	if runeKey == '@' {
+		r.macroRepeatAwaitAt = true
+		return true
+	}
+	if r.macroRepeatAwaitAt {
+		r.macroRepeatAwaitAt = false
+		if r.macroLastRegister != "" && string(runeKey) == r.macroLastRegister {
+			r.macroRepeatPending = false
+			if r.startMacroPlayback(r.macroLastRegister) {
+				if r.Screen != nil {
+					r.draw(nil)
+				}
+				return true
+			}
+			return true
+		}
+		r.macroRepeatPending = false
+		r.updateMacroStatus()
+		return false
+	}
+	if r.macroLastRegister != "" && string(runeKey) == r.macroLastRegister {
+		r.macroRepeatPending = false
+		if r.startMacroPlayback(r.macroLastRegister) {
+			if r.Screen != nil {
+				r.draw(nil)
+			}
+			return true
+		}
+		return true
+	}
+	if runeKey == '@' {
+		r.macroRepeatPending = false
+		if r.macroLastRegister != "" {
+			if r.startMacroPlayback(r.macroLastRegister) {
+				if r.Screen != nil {
+					r.draw(nil)
+				}
+				return true
+			}
+			return true
+		}
+	}
+	r.macroRepeatPending = false
+	r.updateMacroStatus()
+	return false
+}
+
 func (r *Runner) handleMacroPending(ev *tcell.EventKey) bool {
-	if !r.macroPendingRecord && !r.macroPendingPlay {
+	if !r.macroPendingRecord && !r.macroPendingPlay && !r.macroRepeatPending && !r.macroRepeatAwaitAt {
 		return false
 	}
 	if r.isCancelKey(ev) {
@@ -183,6 +263,23 @@ func (r *Runner) handleMacroPending(ev *tcell.EventKey) bool {
 		}
 		return true
 	}
+	if r.macroRepeatPending {
+		r.macroRepeatPending = false
+		r.macroRepeatAwaitAt = false
+		if r.macroLastRegister != "" && reg == r.macroLastRegister {
+			if r.startMacroPlayback(reg) {
+				if r.Screen != nil {
+					r.draw(nil)
+				}
+				return true
+			}
+		}
+		r.updateMacroStatus()
+		if r.Screen != nil {
+			r.draw(nil)
+		}
+		return false
+	}
 	r.updateMacroStatus()
 	if r.Screen != nil {
 		r.draw(nil)
@@ -194,8 +291,11 @@ func (r *Runner) maybeMacroMenuAction(action func() bool) func() bool {
 	return func() bool {
 		r.macroPendingRecord = false
 		r.macroPendingPlay = false
+		r.macroRepeatPending = false
+		r.macroRepeatAwaitAt = false
 		r.updateMacroStatus()
 		return action()
+
 	}
 }
 
@@ -205,6 +305,24 @@ func (r *Runner) macroStatusLine() string {
 			return "Playing macro @" + r.macroLastRegister
 		}
 		return "Playing macro"
+	}
+	if r.macroRepeatPending {
+		if r.macroLastRegister != "" {
+			return "Replay macro @" + r.macroLastRegister + " or @@"
+		}
+		return "Replay macro"
+	}
+	if r.macroRepeatAwaitAt {
+		if r.macroLastRegister != "" {
+			return "Replay macro @@" + r.macroLastRegister
+		}
+		return "Replay macro @@"
+	}
+	if r.macroRepeatPending {
+		if r.macroLastRegister != "" {
+			return "Replay macro @" + r.macroLastRegister
+		}
+		return "Replay macro"
 	}
 	if r.macroRecording {
 		if r.macroRecordRegister != "" {

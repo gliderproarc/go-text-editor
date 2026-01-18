@@ -72,6 +72,9 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 	if r.handleMacroPending(ev) {
 		return false
 	}
+	if r.handleMacroRepeat(ev) {
+		return false
+	}
 	if r.Mode == ModeNormal && ev.Key() == tcell.KeyRune && ev.Modifiers() == 0 {
 		if ev.Rune() >= '1' && ev.Rune() <= '9' {
 			r.PendingCount = r.PendingCount*10 + int(ev.Rune()-'0')
@@ -167,15 +170,6 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 			return false
 		case '@':
 			if r.macroRecording {
-				return false
-			}
-			register := r.lastMacroRegister()
-			if register != "" {
-				if r.startMacroPlayback(register) {
-					if r.Screen != nil {
-						r.draw(nil)
-					}
-				}
 				return false
 			}
 			if r.beginMacroPlayback("") {
