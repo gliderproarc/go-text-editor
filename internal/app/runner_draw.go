@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	"example.com/texteditor/pkg/buffer"
 	"example.com/texteditor/pkg/config"
 	"example.com/texteditor/pkg/search"
@@ -37,24 +39,10 @@ func drawUI(s tcell.Screen, th config.Theme, macroStatus string) {
 	status := "Press Ctrl+Q to exit"
 	sbX := (width - len(status)) / 2
 	statusRow := height - 1
-	if macroStatus != "" {
-		statusRow = height - 2
-	}
 	for i, r := range status {
 		s.SetContent(sbX+i, statusRow, r, nil, tcell.StyleDefault.Foreground(th.StatusForeground).Background(th.StatusBackground))
 	}
-	if macroStatus != "" {
-		macroLine := macroStatus
-		if len(macroLine) > width {
-			macroLine = string([]rune(macroLine)[:width])
-		}
-		for i, r := range macroLine {
-			s.SetContent(i, height-1, r, nil, tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground))
-		}
-		for i := len([]rune(macroLine)); i < width; i++ {
-			s.SetContent(i, height-1, ' ', nil, tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground))
-		}
-	}
+	drawMacroRecordingIndicator(s, th, statusRow, width, macroStatus)
 	s.Show()
 }
 
@@ -226,9 +214,6 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 	// set default UI style
 	s.SetStyle(tcell.StyleDefault.Foreground(th.UIForeground).Background(th.UIBackground))
 	statusLineCount := 1
-	if macroStatus != "" {
-		statusLineCount = 2
-	}
 	mbHeight := len(minibuf)
 	maxLines := height - statusLineCount - mbHeight
 	if maxLines < 0 {
@@ -397,14 +382,9 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 	if isFileManager {
 		modeTag := "<FM>"
 		status := modeTag + "  " + display + " — Enter to open, Esc to close"
-		if len(status) > width {
-			status = string([]rune(status)[:width])
-		}
+		status = truncateStatusForIndicator(status, width, macroStatus)
 		modeColor := tcell.ColorOrange
 		statusRow := height - 1
-		if macroStatus != "" {
-			statusRow = height - 2
-		}
 		for i, r := range status {
 			style := tcell.StyleDefault.Foreground(th.StatusForeground).Background(th.StatusBackground)
 			if i < len(modeTag) {
@@ -412,20 +392,7 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 			}
 			s.SetContent(i, statusRow, r, nil, style)
 		}
-		if macroStatus != "" {
-			macroLine := macroStatus
-			if len(macroLine) > width {
-				macroLine = string([]rune(macroLine)[:width])
-			}
-			for i, r := range macroLine {
-				style := tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground)
-				s.SetContent(i, height-1, r, nil, style)
-			}
-			for i := len([]rune(macroLine)); i < width; i++ {
-				style := tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground)
-				s.SetContent(i, height-1, ' ', nil, style)
-			}
-		}
+		drawMacroRecordingIndicator(s, th, statusRow, width, macroStatus)
 		// draw mini-buffer lines just above status bar
 		for i, line := range minibuf {
 			y := height - statusLineCount - mbHeight + i
@@ -467,9 +434,7 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 		}
 	}
 	status := modeTag + "  " + display + " — Press Ctrl+Q to exit"
-	if len(status) > width {
-		status = string([]rune(status)[:width])
-	}
+	status = truncateStatusForIndicator(status, width, macroStatus)
 	// Colorize mode indicators: <N>, <V>, <I> match cursor; <M>=orange; <S>=red
 	modeColor := th.StatusForeground
 	switch overlay {
@@ -482,9 +447,6 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 		modeColor = cursorColor
 	}
 	statusRow := height - 1
-	if macroStatus != "" {
-		statusRow = height - 2
-	}
 	for i, r := range status {
 		style := tcell.StyleDefault.Foreground(th.StatusForeground).Background(th.StatusBackground)
 		if i < len(modeTag) {
@@ -492,20 +454,7 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 		}
 		s.SetContent(i, statusRow, r, nil, style)
 	}
-	if macroStatus != "" {
-		macroLine := macroStatus
-		if len(macroLine) > width {
-			macroLine = string([]rune(macroLine)[:width])
-		}
-		for i, r := range macroLine {
-			style := tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground)
-			s.SetContent(i, height-1, r, nil, style)
-		}
-		for i := len([]rune(macroLine)); i < width; i++ {
-			style := tcell.StyleDefault.Foreground(th.MiniForeground).Background(th.MiniBackground)
-			s.SetContent(i, height-1, ' ', nil, style)
-		}
-	}
+	drawMacroRecordingIndicator(s, th, statusRow, width, macroStatus)
 	// draw mini-buffer lines just above status bar
 	for i, line := range minibuf {
 		y := height - statusLineCount - mbHeight + i
@@ -527,4 +476,45 @@ func drawFile(s tcell.Screen, fname string, lines []string, highlights []search.
 		}
 	}
 	s.Show()
+}
+
+const macroRecordingIndicator = "<R>"
+
+func isMacroRecording(macroStatus string) bool {
+	return strings.HasPrefix(macroStatus, "Recording macro")
+}
+
+func truncateStatusForIndicator(status string, width int, macroStatus string) string {
+	if width <= 0 {
+		return ""
+	}
+	maxWidth := width
+	if isMacroRecording(macroStatus) {
+		indicatorRunes := len([]rune(macroRecordingIndicator))
+		if width > indicatorRunes {
+			maxWidth = width - indicatorRunes
+		} else {
+			maxWidth = 0
+		}
+	}
+	statusRunes := []rune(status)
+	if len(statusRunes) > maxWidth {
+		status = string(statusRunes[:maxWidth])
+	}
+	return status
+}
+
+func drawMacroRecordingIndicator(s tcell.Screen, th config.Theme, row int, width int, macroStatus string) {
+	if !isMacroRecording(macroStatus) {
+		return
+	}
+	indicatorRunes := []rune(macroRecordingIndicator)
+	if width < len(indicatorRunes) {
+		return
+	}
+	startX := width - len(indicatorRunes)
+	style := tcell.StyleDefault.Foreground(tcell.ColorRed).Background(th.StatusBackground)
+	for i, r := range indicatorRunes {
+		s.SetContent(startX+i, row, r, nil, style)
+	}
 }

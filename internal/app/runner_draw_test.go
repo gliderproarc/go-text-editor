@@ -93,7 +93,7 @@ func TestDrawBuffer_MiniBuffer(t *testing.T) {
 	}
 }
 
-func TestDrawFile_MacroStatusLine(t *testing.T) {
+func TestDrawFile_MacroRecordingIndicator(t *testing.T) {
 	s := tcell.NewSimulationScreen("UTF-8")
 	if err := s.Init(); err != nil {
 		t.Fatalf("initializing simulation screen failed: %v", err)
@@ -105,11 +105,16 @@ func TestDrawFile_MacroStatusLine(t *testing.T) {
 	macroStatus := "Recording macro @a"
 	drawFile(s, "f.txt", lines, nil, -1, false, ModeNormal, OverlayNone, 0, nil, config.DefaultTheme(), macroStatus)
 
-	_, height := s.Size()
-	for i, r := range macroStatus {
-		cr, _, _, _ := s.GetContent(i, height-1)
+	width, height := s.Size()
+	startX := width - len([]rune(macroRecordingIndicator))
+	expectedStyle := tcell.StyleDefault.Foreground(tcell.ColorRed).Background(config.DefaultTheme().StatusBackground)
+	for i, r := range macroRecordingIndicator {
+		cr, _, style, _ := s.GetContent(startX+i, height-1)
 		if cr != r {
-			t.Fatalf("expected macro status %q at %d, got %q", string(r), i, string(cr))
+			t.Fatalf("expected macro indicator %q at %d, got %q", string(r), startX+i, string(cr))
+		}
+		if style != expectedStyle {
+			t.Fatalf("expected macro indicator style at %d, got %v", startX+i, style)
 		}
 	}
 }
