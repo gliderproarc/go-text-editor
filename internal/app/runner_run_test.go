@@ -446,7 +446,7 @@ func TestRun_MnemonicMenuMacroRecord_Simulation(t *testing.T) {
 
 	statusLine := "Recording macro @b"
 	waitForMacroStatus(t, r, statusLine)
-	assertMacroStatusRow(t, s, statusLine)
+	assertMacroRecordingIndicator(t, s)
 
 	t.Logf("macro status snapshot: %q", r.MacroStatus)
 
@@ -477,14 +477,15 @@ func waitForMacroStatus(t *testing.T, r *Runner, want string) {
 	}
 }
 
-func assertMacroStatusRow(t *testing.T, s tcell.Screen, statusLine string) {
+func assertMacroRecordingIndicator(t *testing.T, s tcell.Screen) {
 	t.Helper()
 	deadline := time.After(500 * time.Millisecond)
 	for {
-		_, height := s.Size()
+		width, height := s.Size()
 		match := true
-		for i, r := range statusLine {
-			cr, _, _, _ := s.GetContent(i, height-1)
+		startX := width - len([]rune(macroRecordingIndicator))
+		for i, r := range macroRecordingIndicator {
+			cr, _, _, _ := s.GetContent(startX+i, height-1)
 			if cr != r {
 				match = false
 				break
@@ -495,9 +496,10 @@ func assertMacroStatusRow(t *testing.T, s tcell.Screen, statusLine string) {
 		}
 		select {
 		case <-deadline:
-			_, height := s.Size()
-			cr, _, _, _ := s.GetContent(0, height-1)
-			t.Fatalf("expected macro status %q at 0, got %q", string(statusLine[0]), string(cr))
+			width, height := s.Size()
+			startX := width - len([]rune(macroRecordingIndicator))
+			cr, _, _, _ := s.GetContent(startX, height-1)
+			t.Fatalf("expected macro indicator %q at %d, got %q", string(macroRecordingIndicator[0]), startX, string(cr))
 		case <-time.After(10 * time.Millisecond):
 		}
 	}
