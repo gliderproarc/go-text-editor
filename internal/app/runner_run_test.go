@@ -652,3 +652,43 @@ func TestRun_GoToPrompt_Simulation(t *testing.T) {
 		t.Fatalf("expected cursor %d after go-to, got %d", expected, r.Cursor)
 	}
 }
+
+func TestRun_CommandMenu_Triggers_M7Keys(t *testing.T) {
+	testCases := []struct {
+		name string
+		ev   *tcell.EventKey
+	}{
+		{name: "f2", ev: tcell.NewEventKey(tcell.KeyF2, 0, 0)},
+		{name: "alt_x", ev: tcell.NewEventKey(tcell.KeyRune, 'x', tcell.ModAlt)},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := tcell.NewSimulationScreen("UTF-8")
+			if err := s.Init(); err != nil {
+				t.Fatalf("init sim screen: %v", err)
+			}
+			defer s.Fini()
+
+			r := &Runner{Screen: s, Buf: buffer.NewGapBufferFromString("abc"), History: history.New()}
+			done := make(chan error, 1)
+			go func() { done <- r.Run() }()
+			time.Sleep(10 * time.Millisecond)
+
+			s.PostEventWait(tc.ev)
+			for _, ch := range "quit" {
+				s.PostEventWait(tcell.NewEventKey(tcell.KeyRune, ch, 0))
+			}
+			s.PostEventWait(tcell.NewEventKey(tcell.KeyEnter, 0, 0))
+
+			select {
+			case err := <-done:
+				if err != nil {
+					t.Fatalf("runner returned error: %v", err)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatalf("timeout waiting for runner to quit")
+			}
+
+		})
+	}
+}

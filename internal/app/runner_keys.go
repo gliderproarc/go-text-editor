@@ -651,7 +651,7 @@ func (r *Runner) handleKeyEvent(ev *tcell.EventKey) bool {
 		}
 		return false
 	}
-	if r.matchCommand(ev, "menu") {
+	if r.isCommandMenuTrigger(ev) || r.matchCommand(ev, "menu") {
 		return r.runCommandMenu()
 	}
 	// Ctrl+O -> open file prompt (handle both rune+Ctrl and dedicated control key)
@@ -1159,6 +1159,10 @@ func (r *Runner) matchCommand(ev *tcell.EventKey, name string) bool {
 		return false
 	}
 	return kb.Matches(ev)
+}
+
+func (r *Runner) isCommandMenuTrigger(ev *tcell.EventKey) bool {
+	return ev.Key() == tcell.KeyF2 || (ev.Key() == tcell.KeyRune && ev.Modifiers() == tcell.ModAlt && unicode.ToLower(ev.Rune()) == 'x')
 }
 
 func (r *Runner) performUndo(action string) {

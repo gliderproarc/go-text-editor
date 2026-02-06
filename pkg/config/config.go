@@ -2,8 +2,10 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
@@ -175,18 +177,50 @@ func LoadDefault() (*Config, error) {
 // ParseKeybinding converts a textual key description like "Ctrl+S" into a
 // Keybinding. Currently only Ctrl+<letter> is supported.
 func ParseKeybinding(s string) (Keybinding, error) {
-	parts := strings.Split(s, "+")
-	if len(parts) != 2 {
-		return Keybinding{}, errors.New("invalid keybinding: " + s)
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return Keybinding{}, errors.New("invalid keybinding: empty")
 	}
-	if !strings.EqualFold(parts[0], "ctrl") {
-		return Keybinding{}, errors.New("invalid modifier in keybinding: " + s)
+
+	mod := tcell.ModNone
+	keySpec := s
+	if parts := strings.SplitN(s, "+", 2); len(parts) == 2 {
+		switch {
+		case strings.EqualFold(parts[0], "ctrl"):
+			mod = tcell.ModCtrl
+		case strings.EqualFold(parts[0], "alt"):
+			mod = tcell.ModAlt
+		default:
+			return Keybinding{}, errors.New("invalid modifier in keybinding: " + s)
+		}
+		keySpec = strings.TrimSpace(parts[1])
 	}
-	r := []rune(strings.ToLower(parts[1]))
-	if len(r) != 1 || r[0] < 'a' || r[0] > 'z' {
+
+	keySpec = strings.ToLower(strings.TrimSpace(keySpec))
+	if keySpec == "" {
 		return Keybinding{}, errors.New("invalid key in keybinding: " + s)
 	}
-	return Keybinding{Key: tcell.KeyRune, Rune: r[0], Mod: tcell.ModCtrl}, nil
+	if strings.HasPrefix(keySpec, "f") {
+		n, err := strconv.Atoi(strings.TrimPrefix(keySpec, "f"))
+		if err != nil || n < 1 || n > 12 {
+			return Keybinding{}, fmt.Errorf("invalid function key in keybinding: %s", s)
+		}
+		return Keybinding{Key: tcell.Key(int(tcell.KeyF1) + n - 1), Mod: mod}, nil
+	}
+	if keySpec == "space" {
+		return Keybinding{Key: tcell.KeyRune, Rune: ' ', Mod: mod}, nil
+	}
+	if keySpec == "underscore" {
+		return Keybinding{Key: tcell.KeyRune, Rune: '_', Mod: mod}, nil
+	}
+	if key, ok := namedKeys[keySpec]; ok {
+		return Keybinding{Key: key, Mod: mod}, nil
+	}
+	r := []rune(keySpec)
+	if len(r) == 1 {
+		return Keybinding{Key: tcell.KeyRune, Rune: r[0], Mod: mod}, nil
+	}
+	return Keybinding{}, errors.New("invalid key in keybinding: " + s)
 }
 
 func mustParse(s string) Keybinding {
@@ -221,6 +255,26 @@ var ctrlMap = map[rune]tcell.Key{
 	'x': tcell.KeyCtrlX,
 	'y': tcell.KeyCtrlY,
 	'z': tcell.KeyCtrlZ,
+}
+
+var namedKeys = map[string]tcell.Key{
+	"enter":     tcell.KeyEnter,
+	"esc":       tcell.KeyEsc,
+	"escape":    tcell.KeyEsc,
+	"tab":       tcell.KeyTab,
+	"backspace": tcell.KeyBackspace2,
+	"delete":    tcell.KeyDelete,
+	"insert":    tcell.KeyInsert,
+	"home":      tcell.KeyHome,
+	"end":       tcell.KeyEnd,
+	"pgup":      tcell.KeyPgUp,
+	"pageup":    tcell.KeyPgUp,
+	"pgdn":      tcell.KeyPgDn,
+	"pagedown":  tcell.KeyPgDn,
+	"up":        tcell.KeyUp,
+	"down":      tcell.KeyDown,
+	"left":      tcell.KeyLeft,
+	"right":     tcell.KeyRight,
 }
 
 // Matches returns true if the binding matches the provided event.

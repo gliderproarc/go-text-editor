@@ -140,6 +140,9 @@ func (r *Runner) isMacroCaptureAllowed(ev *tcell.EventKey) bool {
 	if r.matchCommand(ev, "save") || r.matchCommand(ev, "quit") || r.matchCommand(ev, "menu") {
 		return false
 	}
+	if r.isCommandMenuTrigger(ev) {
+		return false
+	}
 	return true
 }
 

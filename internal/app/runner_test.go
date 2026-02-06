@@ -67,6 +67,19 @@ func TestHandleKeyEvent_ShowHelp_CtrlKey(t *testing.T) {
 	}
 }
 
+func TestCommandMenuTrigger_M7Keys(t *testing.T) {
+	r := &Runner{}
+	if !r.isCommandMenuTrigger(tcell.NewEventKey(tcell.KeyF2, 0, 0)) {
+		t.Fatalf("expected F2 to trigger command menu")
+	}
+	if !r.isCommandMenuTrigger(tcell.NewEventKey(tcell.KeyRune, 'x', tcell.ModAlt)) {
+		t.Fatalf("expected Alt+X to trigger command menu")
+	}
+	if r.isCommandMenuTrigger(tcell.NewEventKey(tcell.KeyRune, 'x', 0)) {
+		t.Fatalf("did not expect plain x to trigger command menu")
+	}
+}
+
 func TestRunner_InsertAndSave(t *testing.T) {
 	tmp, err := os.CreateTemp("", "texteditor_test_*")
 	if err != nil {

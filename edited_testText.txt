@@ -1,0 +1,14 @@
+Oh interesting. If you delete the last character of a file, it says there is no file.
+Oh interesting. If you delete the last character of a file, it says there is no file.
+Oh interesting. If you delete the last character of a file, it says there is no file.
+
+Pretty nice.
+
+This is a text test
+
+hey there
+hey there
+
+
+
+
